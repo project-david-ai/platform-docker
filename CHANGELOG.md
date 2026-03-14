@@ -1,3 +1,10 @@
+## [1.8.4](https://github.com/project-david-ai/platform-docker/compare/v1.8.3...v1.8.4) (2026-03-14)
+
+
+### Bug Fixes
+
+* correct and standardize .env and related file paths ([9e49242](https://github.com/project-david-ai/platform-docker/commit/9e49242c6230236b4a3579511cc790e58d8d6c10))
+
 ## [1.8.3](https://github.com/project-david-ai/platform-docker/compare/v1.8.2...v1.8.3) (2026-03-14)
 
 
