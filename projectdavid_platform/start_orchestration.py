@@ -154,7 +154,7 @@ class Orchestrator:
     """
 
     _ENV_FILE = ".env"
-    _ENV_EXAMPLE_FILE = "..env.example"
+    _ENV_EXAMPLE_FILE = ".env.example"
 
     _GENERATED_SECRETS = [
         "SIGNED_URL_SECRET",
@@ -338,6 +338,20 @@ class Orchestrator:
         self._ensure_dockerignore()
 
     # ------------------------------------------------------------------
+    # .env path helpers
+    # ------------------------------------------------------------------
+
+    @property
+    def _env_file_abs(self) -> str:
+        """
+        Absolute path to the .env file in the current working directory.
+        Always resolves from CWD so Docker Compose receives a fully-qualified
+        path regardless of where the bundled compose file lives (e.g. inside
+        site-packages after a pip install).
+        """
+        return str(Path(self._ENV_FILE).resolve())
+
+    # ------------------------------------------------------------------
     # Preflight dependency checks
     # ------------------------------------------------------------------
 
@@ -436,7 +450,13 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _compose_files(self) -> List[str]:
-        files = ["-f", self.base_compose]
+        """
+        Build the -f / --env-file fragment inserted before every docker compose
+        sub-command.  --env-file is given as an absolute CWD path so that
+        Docker Compose finds the project .env even when the bundled compose
+        file lives inside site-packages.
+        """
+        files = ["--env-file", self._env_file_abs, "-f", self.base_compose]
         if getattr(self.args, "gpu", False):
             files += ["-f", self.gpu_compose]
         return files
@@ -476,7 +496,7 @@ class Orchestrator:
             raise
 
     def _ensure_dockerignore(self):
-        di = Path("../.dockerignore")
+        di = Path(".dockerignore")
         if not di.exists():
             di.write_text(
                 "__pycache__/\n.venv/\nnode_modules/\n*.log\n*.pyc\n.git/\n"
@@ -734,9 +754,7 @@ class Orchestrator:
         failed = False
         for key in self._GENERATED_SECRETS:
             if os.environ.get(key, "") in self._INSECURE_VALUES:
-                self.log.error(
-                    "Insecure value for '%s'. Delete .env and re-run to regenerate.", key
-                )
+                self.log.error("Insure value for '%s'. Delete .env and re-run to regenerate.", key)
                 failed = True
         if failed:
             raise SystemExit(1)
@@ -895,6 +913,8 @@ class Orchestrator:
         cmd = [
             "docker",
             "compose",
+            "--env-file",
+            self._env_file_abs,
             "-f",
             self.base_compose,
             "exec",
@@ -922,6 +942,8 @@ class Orchestrator:
         cmd = [
             "docker",
             "compose",
+            "--env-file",
+            self._env_file_abs,
             "-f",
             self.base_compose,
             "exec",
@@ -946,6 +968,8 @@ class Orchestrator:
         cmd = [
             "docker",
             "compose",
+            "--env-file",
+            self._env_file_abs,
             "-f",
             self.base_compose,
             "exec",
@@ -1293,11 +1317,11 @@ def setup_assistant(
 # Package structure note
 # ---------------------------------------------------------------------------
 # For importlib.resources to resolve bundled compose files, the package
-# directory projectdavid_platform/ must exist and contain:
+# directory projectdavid_platform/ must contain:
 #   - __init__.py
 #   - docker-compose.yml
 #   - docker-compose.gpu.yml
-#   - ..env.example
+#   - .env.example
 # ---------------------------------------------------------------------------
 
 
