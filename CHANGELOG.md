@@ -1,3 +1,21 @@
+# [1.9.0](https://github.com/project-david-ai/platform-docker/compare/v1.8.4...v1.9.0) (2026-03-14)
+
+
+### Bug Fixes
+
+* remove unnecessary blank line in test_env_generation tests ([031a5d4](https://github.com/project-david-ai/platform-docker/commit/031a5d40c84be622111187f7035cdd3cc7022d93))
+* remove unnecessary blank line in test_env_generation tests ([ef7f510](https://github.com/project-david-ai/platform-docker/commit/ef7f51025da7495e75fa559cf7e84a2576b48648))
+* remove unused imports across test files ([f6335a1](https://github.com/project-david-ai/platform-docker/commit/f6335a1b37a9b1851e57af73c4086d8fddb93a75))
+* remove unused variables in test_env_generation tests ([2cdc69f](https://github.com/project-david-ai/platform-docker/commit/2cdc69fcf2a6bc90ba195fb2d9ef65fd7a8ea7f1))
+* remove unused variables in test_env_generation tests ([6e4b096](https://github.com/project-david-ai/platform-docker/commit/6e4b0963d8b72dc1a9eeedcc21ceb3c699e749e2))
+* remove unused variables in test_env_generation tests ([c37105a](https://github.com/project-david-ai/platform-docker/commit/c37105ac0eff3c8fb88d8dba5fb377bd33a46a60))
+
+
+### Features
+
+* add comprehensive test suite and update documentation ([a3b95b9](https://github.com/project-david-ai/platform-docker/commit/a3b95b99b6c80744d1bbb9f4b52d2a6ac60f5733))
+* integrate test step into CI workflow ([6fc7e30](https://github.com/project-david-ai/platform-docker/commit/6fc7e306eb77bcd7297df6a07703b29e18095c1f))
+
 ## [1.8.4](https://github.com/project-david-ai/platform-docker/compare/v1.8.3...v1.8.4) (2026-03-14)
 
 
