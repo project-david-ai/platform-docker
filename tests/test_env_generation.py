@@ -10,7 +10,6 @@ Verifies that:
 - The generated file is parseable and contains all expected sections
 """
 from __future__ import annotations
-
 import re
 
 import pytest
