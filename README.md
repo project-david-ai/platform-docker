@@ -22,7 +22,7 @@ No repository clone required. The compose files and configuration templates are 
 ## Quick Start
 
 ```bash
-platform --mode up
+pdavid --mode up
 ```
 
 On first run this will:
@@ -35,10 +35,86 @@ On first run this will:
 ### GPU stack (vLLM + Ollama)
 
 ```bash
-platform --mode up --gpu
+pdavid --mode up --gpu
 ```
 
 Requires an NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed.
+
+---
+
+## Stack
+
+```mermaid
+%%{init: {
+  "theme": "base",
+  "themeVariables": {
+    "background": "#f8f9fc",
+    "primaryColor": "#dbeafe",
+    "primaryTextColor": "#1e3a5f",
+    "primaryBorderColor": "#3b82f6",
+    "secondaryColor": "#fef3c7",
+    "secondaryTextColor": "#78350f",
+    "secondaryBorderColor": "#f59e0b",
+    "tertiaryColor": "#ede9fe",
+    "tertiaryTextColor": "#4c1d95",
+    "tertiaryBorderColor": "#7c3aed",
+    "nodeTextColor": "#1e293b",
+    "edgeLabelBackground": "#f1f5f9",
+    "clusterBkg": "#f8faff",
+    "clusterBorder": "#cbd5e1",
+    "titleColor": "#1e293b",
+    "lineColor": "#94a3b8",
+    "fontSize": "16px",
+    "fontFamily": "Georgia, serif"
+  }
+}}%%
+flowchart TD
+    INSTALL["pip install projectdavid-platform"]
+    CMD["pdavid --mode up"]
+    API["api — FastAPI backend"]
+    SANDBOX["sandbox — Secure code execution"]
+    DB["db — MySQL 8.0"]
+    REDIS["redis — Cache and message broker"]
+    QDRANT["qdrant — Vector database"]
+    SEARXNG["searxng — Self-hosted web search"]
+    BROWSER["browser — Headless browser / web agent"]
+    OTEL["otel-collector — Telemetry collection"]
+    JAEGER["jaeger — Distributed tracing UI"]
+    SAMBA["samba — File sharing"]
+    OLLAMA["ollama — Local LLM inference  ·  --gpu only"]
+    VLLM["vllm — GPU inference  ·  --gpu only"]
+
+    INSTALL --> CMD
+
+    CMD ~~~ API
+    API ~~~ SANDBOX
+    SANDBOX ~~~ DB
+    DB ~~~ REDIS
+    REDIS ~~~ QDRANT
+    QDRANT ~~~ SEARXNG
+    SEARXNG ~~~ BROWSER
+    BROWSER ~~~ OTEL
+    OTEL ~~~ JAEGER
+    JAEGER ~~~ SAMBA
+    SAMBA ~~~ OLLAMA
+    OLLAMA ~~~ VLLM
+
+    classDef install fill:#ede9fe,stroke:#7c3aed,stroke-width:1.5px,color:#4c1d95
+    classDef cmd    fill:#dbeafe,stroke:#3b82f6,stroke-width:1.5px,color:#1e3a5f
+    classDef core   fill:#dbeafe,stroke:#3b82f6,stroke-width:1px,color:#1e3a5f
+    classDef intel  fill:#fef3c7,stroke:#f59e0b,stroke-width:1px,color:#78350f
+    classDef obs    fill:#ede9fe,stroke:#7c3aed,stroke-width:1px,color:#4c1d95
+    classDef files  fill:#dcfce7,stroke:#22c55e,stroke-width:1px,color:#14532d
+    classDef gpu    fill:#fdf2f8,stroke:#ec4899,stroke-width:1px,color:#831843
+
+    class INSTALL install
+    class CMD cmd
+    class API,SANDBOX,DB,REDIS,QDRANT core
+    class SEARXNG,BROWSER intel
+    class OTEL,JAEGER obs
+    class SAMBA files
+    class OLLAMA,VLLM gpu
+```
 
 ---
 
@@ -74,43 +150,43 @@ Requires an NVIDIA GPU with the [NVIDIA Container Toolkit](https://docs.nvidia.c
 ### Start the stack
 
 ```bash
-platform --mode up
+pdavid --mode up
 ```
 
 ### Start with GPU services
 
 ```bash
-platform --mode up --gpu
+pdavid --mode up --gpu
 ```
 
 ### Stop the stack
 
 ```bash
-platform --mode down_only
+pdavid --mode down_only
 ```
 
 ### Stop and remove all volumes
 
 ```bash
-platform --mode down_only --clear-volumes
+pdavid --mode down_only --clear-volumes
 ```
 
 ### Force recreate all containers
 
 ```bash
-platform --mode up --force-recreate
+pdavid --mode up --force-recreate
 ```
 
 ### Stream logs
 
 ```bash
-platform --mode logs --follow
+pdavid --mode logs --follow
 ```
 
 ### Destroy all stack data
 
 ```bash
-platform --nuke
+pdavid --nuke
 ```
 
 Requires interactive confirmation. Cannot be undone.
@@ -124,14 +200,14 @@ Requires interactive confirmation. Cannot be undone.
 Optional values such as the HuggingFace token can be set at any time without regenerating secrets:
 
 ```bash
-platform configure --set HF_TOKEN=hf_abc123
-platform configure --set VLLM_MODEL=Qwen/Qwen2.5-VL-7B-Instruct
+pdavid configure --set HF_TOKEN=hf_abc123
+pdavid configure --set VLLM_MODEL=Qwen/Qwen2.5-VL-7B-Instruct
 ```
 
 Or interactively:
 
 ```bash
-platform configure --interactive
+pdavid configure --interactive
 ```
 
 ### Rotating secrets
@@ -139,7 +215,7 @@ platform configure --interactive
 The orchestrator warns when a change requires additional steps to apply safely. Database password rotation requires clearing the initialised volume:
 
 ```bash
-platform configure --set MYSQL_PASSWORD=<new_password>
+pdavid configure --set MYSQL_PASSWORD=<new_password>
 # Follow the warning instructions printed by the command
 ```
 
@@ -151,13 +227,13 @@ Once the stack is running, provision the admin user and default assistant:
 
 ```bash
 # Bootstrap the default admin user
-platform bootstrap-admin
+pdavid bootstrap-admin
 
 # Create a regular user
-platform create-user --email user@example.com --name "Alice"
+pdavid create-user --email user@example.com --name "Alice"
 
 # Set up the default assistant
-platform setup-assistant --api-key ad_... --user-id usr_...
+pdavid setup-assistant --api-key ad_... --user-id usr_...
 ```
 
 Full provisioning walkthrough: [`docs/boot_strap.md`](docs/boot_strap.md)
@@ -188,8 +264,9 @@ Both owned images are published to Docker Hub and updated automatically on each 
 This repository is intended for deploying prebuilt images. To develop, extend, or contribute to the platform source:
 
 ```bash
-git clone https://github.com/project-david-ai/platform
-
+git clone https://github.com/frankie336/entities_api.git
+cd entities_api
+pip install -e .
 ```
 
 ---
