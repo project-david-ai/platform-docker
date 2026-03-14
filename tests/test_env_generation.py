@@ -35,8 +35,6 @@ def generated_env(orchestrator, tmp_env, monkeypatch):
 # ---------------------------------------------------------------------------
 # Uniqueness — the core security guarantee
 # ---------------------------------------------------------------------------
-
-
 class TestSecretUniqueness:
     def test_two_installs_produce_different_mysql_passwords(
         self, make_orchestrator, tmp_path, monkeypatch
@@ -109,8 +107,6 @@ class TestNoInsecureValues:
 # ---------------------------------------------------------------------------
 # DB URL construction
 # ---------------------------------------------------------------------------
-
-
 class TestDatabaseURLConstruction:
     def test_database_url_is_constructed_from_components(self, generated_env):
         assert "DATABASE_URL=mysql+pymysql://" in generated_env
