@@ -77,8 +77,8 @@ DEFAULT_DB_CONTAINER_PORT = "3306"
 DEFAULT_DB_SERVICE_NAME = "db"
 API_SERVICE_NAME = "api"
 API_CONTAINER_NAME = "fastapi_cosmic_catalyst"
-BASE_COMPOSE_FILE = "docker-compose.yml"
-GPU_COMPOSE_FILE = "docker-compose.gpu.yml"
+BASE_COMPOSE_FILE = "../docker-compose.yml"
+GPU_COMPOSE_FILE = "../docker-compose.gpu.yml"
 PACKAGE_NAME = "projectdavid_platform"
 
 # Platform-specific Docker install URLs
@@ -154,7 +154,7 @@ class Orchestrator:
     """
 
     _ENV_FILE = ".env"
-    _ENV_EXAMPLE_FILE = ".env.example"
+    _ENV_EXAMPLE_FILE = "..env.example"
 
     _GENERATED_SECRETS = [
         "SIGNED_URL_SECRET",
@@ -476,7 +476,7 @@ class Orchestrator:
             raise
 
     def _ensure_dockerignore(self):
-        di = Path(".dockerignore")
+        di = Path("../.dockerignore")
         if not di.exists():
             di.write_text(
                 "__pycache__/\n.venv/\nnode_modules/\n*.log\n*.pyc\n.git/\n"
@@ -1297,7 +1297,7 @@ def setup_assistant(
 #   - __init__.py
 #   - docker-compose.yml
 #   - docker-compose.gpu.yml
-#   - .env.example
+#   - ..env.example
 # ---------------------------------------------------------------------------
 
 
