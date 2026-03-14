@@ -44,8 +44,8 @@ jobs:
 
       - name: 🐳 Validate Compose Files
         run: |
-          docker compose -f docker-compose.yml config --quiet
-          docker compose -f docker-compose.yml -f docker-compose.gpu.yml config --quiet
+          docker compose -f docker-compose.yml config --quiet --no-interpolate
+          docker compose -f docker-compose.yml -f docker-compose.gpu.yml config --quiet --no-interpolate
 
   release:
     name: 🚀 Git Version & Changelog
