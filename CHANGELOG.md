@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/project-david-ai/platform-docker/compare/v1.5.0...v1.6.0) (2026-03-14)
+
+
+### Features
+
+* update CI workflow to include release and publish steps ([c21e1f7](https://github.com/project-david-ai/platform-docker/commit/c21e1f741b27b47ce5aa90059b79dafb6bf72456))
+
 # [1.5.0](https://github.com/project-david-ai/platform-docker/compare/v1.4.0...v1.5.0) (2026-03-14)
 
 
