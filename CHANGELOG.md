@@ -1,3 +1,27 @@
+# [1.4.0](https://github.com/project-david-ai/platform-docker/compare/v1.3.0...v1.4.0) (2026-03-14)
+
+
+### Bug Fixes
+
+* correct version script name in releaserc ([48e06c3](https://github.com/project-david-ai/platform-docker/commit/48e06c33ab1191490e738cf8e1c3677694d62365))
+
+
+### Features
+
+* add .env.example with guided setup instructions and placeholders for config values ([a69fed3](https://github.com/project-david-ai/platform-docker/commit/a69fed3b297ef0fce2e8d4a1e87c1ba7cea291a3))
+* add `--no-interpolate` to docker compose validation steps in CI workflow ([2427a92](https://github.com/project-david-ai/platform-docker/commit/2427a92ad7c2f3dae89b04cf6845201b0f87e297))
+* add fallback for HF_CACHE_PATH and VLLM_MODEL in docker-compose.gpu.yml to improve usability ([cf6df0e](https://github.com/project-david-ai/platform-docker/commit/cf6df0e59924e565f93a09f54a0be587056da051))
+* add fallback for SHARED_PATH in docker-compose volumes to improve usability ([b2889b8](https://github.com/project-david-ai/platform-docker/commit/b2889b89987ada2af29729069427ede230ed1164))
+* add package initialization, resolve compose file paths via importlib, and improve CLI documentation for projectdavid-platform ([5091bd4](https://github.com/project-david-ai/platform-docker/commit/5091bd4437167f3f867067903c3dc136cffe03c3))
+* remove bootstrap scripts ([bbf1b57](https://github.com/project-david-ai/platform-docker/commit/bbf1b5742be06771d85d96697ef2f0a1d9e20df8))
+* remove bootstrap scripts ([bb0dc54](https://github.com/project-david-ai/platform-docker/commit/bb0dc54bbe97ffe32b73c085cef7a189d206f211))
+* rename package and update README, CLI commands, and example scripts to reflect "projectdavid-platform" ([e0c2cd9](https://github.com/project-david-ai/platform-docker/commit/e0c2cd9b2a1d93e893f012216aabb51b98843237))
+* rename package to projectdavid-platform, bundle compose files for pip distribution ([542dbb5](https://github.com/project-david-ai/platform-docker/commit/542dbb5f2da3e72dd21e365d19c3e433028b9e7b))
+* update module reference in modules.xml and cleanup version_control.py ([15e6801](https://github.com/project-david-ai/platform-docker/commit/15e68019d18dc57c9b9119ce7ec7fbc687a1affc))
+* update module reference in modules.xml and cleanup version_control.py ([2b5b5f6](https://github.com/project-david-ai/platform-docker/commit/2b5b5f6da32fbe29f72e5e332e2e6d075cdba62b))
+* update module reference in modules.xml and cleanup version_control.py ([794acd7](https://github.com/project-david-ai/platform-docker/commit/794acd7f390df40b4d09a865a2a11632c54df885))
+* wrap environment variables in docker-compose.yml with quotes ([fad9283](https://github.com/project-david-ai/platform-docker/commit/fad9283eaafad95a9cc33785a674d26932580e72))
+
 # [1.3.0](https://github.com/frankie336/entities/compare/v1.2.0...v1.3.0) (2025-04-19)
 
 
