@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/project-david-ai/platform-docker/compare/v1.7.0...v1.8.0) (2026-03-14)
+
+
+### Features
+
+* update CI release workflow to use cycjimmy/semantic-release-action ([e479a01](https://github.com/project-david-ai/platform-docker/commit/e479a01b34719deeddf8b69f78ce5d55cfbd4779))
+
 # [1.7.0](https://github.com/project-david-ai/platform-docker/compare/v1.6.0...v1.7.0) (2026-03-14)
 
 
