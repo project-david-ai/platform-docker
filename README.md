@@ -188,10 +188,8 @@ Both owned images are published to Docker Hub and updated automatically on each 
 This repository is intended for deploying prebuilt images. To develop, extend, or contribute to the platform source:
 
 ```bash
-git clone https://github.com/frankie336/entities_api.git
-cd entities_api
-pip install -e .
-entities-api docker-manager --mode up
+git clone https://github.com/project-david-ai/platform
+
 ```
 
 ---

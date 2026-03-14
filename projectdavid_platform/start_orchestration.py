@@ -77,8 +77,8 @@ DEFAULT_DB_CONTAINER_PORT = "3306"
 DEFAULT_DB_SERVICE_NAME = "db"
 API_SERVICE_NAME = "api"
 API_CONTAINER_NAME = "fastapi_cosmic_catalyst"
-BASE_COMPOSE_FILE = "../docker-compose.yml"
-GPU_COMPOSE_FILE = "../docker-compose.gpu.yml"
+BASE_COMPOSE_FILE = "docker-compose.yml"
+GPU_COMPOSE_FILE = "docker-compose.gpu.yml"
 PACKAGE_NAME = "projectdavid_platform"
 
 # Platform-specific Docker install URLs
