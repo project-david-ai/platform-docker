@@ -11,10 +11,10 @@ permissions:
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────
-  # Lint
+  # Lint & Test
   # ──────────────────────────────────────────────────────────────────────────
   lint:
-    name: Lint Orchestration Scripts & Compose Files
+    name: Lint, Test & Validate Compose Files
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -29,15 +29,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-lint-${{ hashFiles('requirements.txt', 'pyproject.toml') }}
+          key: ${{ runner.os }}-pip-lint-${{ hashFiles('pyproject.toml') }}
           restore-keys: |
             ${{ runner.os }}-pip-lint-
 
       - name: Install tools and project dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install ruff==0.4.0 black
+          pip install -e .
+          pip install ruff==0.4.0 black==25.1.0 pytest
 
       - name: Run Ruff Linter
         run: ruff check . --output-format=github
@@ -45,15 +45,16 @@ jobs:
       - name: Run Black Formatter Check
         run: black --check .
 
+      - name: Run Tests
+        run: pytest tests/ --tb=short -q
+
       - name: Validate Compose Files
         run: |
           docker compose -f docker-compose.yml config --quiet --no-interpolate
           docker compose -f docker-compose.yml -f docker-compose.gpu.yml config --quiet --no-interpolate
 
   # ──────────────────────────────────────────────────────────────────────────
-  # Release — semantic versioning, changelog, and GitHub release
-  # Uses cycjimmy/semantic-release-action which correctly exposes step outputs
-  # so the publish job can gate on whether a release was actually cut.
+  # Release
   # ──────────────────────────────────────────────────────────────────────────
   release:
     name: Git Version & Changelog
@@ -96,8 +97,7 @@ jobs:
           echo "New release: v${{ steps.semantic.outputs.new_release_version }}"
 
   # ──────────────────────────────────────────────────────────────────────────
-  # Publish — build wheel and push to PyPI
-  # Only runs when semantic-release actually cut a new release
+  # Publish
   # ──────────────────────────────────────────────────────────────────────────
   publish:
     name: Build & Publish to PyPI
@@ -109,7 +109,6 @@ jobs:
       - name: Checkout repository at new release tag
         uses: actions/checkout@v4
         with:
-          # Check out the bumped tag so pyproject.toml already has the new version
           ref: v${{ needs.release.outputs.new_release_version }}
 
       - name: Set up Python
