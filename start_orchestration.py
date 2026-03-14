@@ -4,12 +4,15 @@
 # Distributed as part of the `projectdavid-platform` pip package.
 #
 # After `pip install projectdavid-platform`:
-#   platform --mode up
-#   platform --mode up --gpu
-#   platform configure --set HF_TOKEN=hf_abc123
-#   platform bootstrap-admin
-#   platform create-user --email user@example.com --name "Alice"
-#   platform setup-assistant --api-key ad_... --user-id usr_...
+#   pdavid --mode up
+#   pdavid --mode up --gpu
+#   pdavid --mode up --exclude vllm --exclude ollama
+#   pdavid --mode up --services api db qdrant
+#   pdavid --mode logs --follow
+#   pdavid configure --set HF_TOKEN=hf_abc123
+#   pdavid bootstrap-admin
+#   pdavid create-user --email user@example.com --name "Alice"
+#   pdavid setup-assistant --api-key ad_... --user-id usr_...
 #
 from __future__ import annotations
 
@@ -78,6 +81,17 @@ BASE_COMPOSE_FILE = "docker-compose.yml"
 GPU_COMPOSE_FILE = "docker-compose.gpu.yml"
 PACKAGE_NAME = "projectdavid_platform"
 
+# Platform-specific Docker install URLs
+_DOCKER_INSTALL_URLS = {
+    "windows": "https://docs.docker.com/desktop/install/windows-install/",
+    "darwin": "https://docs.docker.com/desktop/install/mac-install/",
+    "linux": "https://docs.docker.com/engine/install/",
+}
+_DOCKER_COMPOSE_INSTALL_URL = "https://docs.docker.com/compose/install/"
+_NVIDIA_TOOLKIT_INSTALL_URL = (
+    "https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html"
+)
+
 
 # ---------------------------------------------------------------------------
 # Compose file path resolution
@@ -89,10 +103,8 @@ def _resolve_compose_file(filename: str) -> str:
     Resolve the path to a compose file.
 
     Priority:
-      1. Current working directory — allows users to override bundled files
-         by placing their own copy locally.
-      2. Installed package data — used when running after
-         `pip install projectdavid-platform` with no local copy present.
+      1. Current working directory — local copy wins, enabling overrides.
+      2. Installed package data — used after pip install with no local copy.
     """
     local = Path.cwd() / filename
     if local.exists():
@@ -119,13 +131,14 @@ def _resolve_compose_file(filename: str) -> str:
 # Typer app
 # ---------------------------------------------------------------------------
 app = typer.Typer(
-    name="platform",
+    name="pdavid",
     help=(
         "Deployment orchestrator for the Project David / Entities platform.\n\n"
         "Install:  pip install projectdavid-platform\n"
-        "Start:    platform --mode up\n"
-        "GPU:      platform --mode up --gpu\n"
-        "Config:   platform configure --set HF_TOKEN=hf_abc123"
+        "Start:    pdavid --mode up\n"
+        "GPU:      pdavid --mode up --gpu\n"
+        "Skip svc: pdavid --mode up --exclude vllm --exclude ollama\n"
+        "Config:   pdavid configure --set HF_TOKEN=hf_abc123"
     ),
     add_completion=False,
 )
@@ -325,6 +338,100 @@ class Orchestrator:
         self._ensure_dockerignore()
 
     # ------------------------------------------------------------------
+    # Preflight dependency checks
+    # ------------------------------------------------------------------
+
+    def _has_docker(self) -> bool:
+        """
+        Check Docker is installed and in PATH.
+        Prints a platform-specific install URL if missing — never auto-installs.
+        """
+        if shutil.which("docker"):
+            return True
+
+        system = _platform.system().lower()
+        install_url = _DOCKER_INSTALL_URLS.get(system, "https://docs.docker.com/get-docker/")
+        typer.echo(
+            "\nDocker is not installed or not found in PATH.\n"
+            f"Install Docker for your platform: {install_url}\n"
+            "Once installed, re-run: pdavid --mode up\n",
+            err=True,
+        )
+        return False
+
+    def _has_docker_compose(self) -> bool:
+        """
+        Check the Docker Compose plugin is available.
+        Docker Desktop bundles it; headless Linux installs often do not.
+        """
+        try:
+            self._run_command(
+                ["docker", "compose", "version"],
+                check=True,
+                capture_output=True,
+                suppress_logs=True,
+            )
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            typer.echo(
+                "\nThe Docker Compose plugin is not available.\n"
+                f"Install it: {_DOCKER_COMPOSE_INSTALL_URL}\n"
+                "Once installed, re-run: pdavid --mode up\n",
+                err=True,
+            )
+            return False
+
+    def _has_nvidia_support(self) -> bool:
+        """Check for nvidia-smi — presence implies NVIDIA drivers are installed."""
+        cmd = shutil.which("nvidia-smi")
+        if not cmd:
+            return False
+        try:
+            self._run_command([cmd], check=True, capture_output=True, suppress_logs=True)
+            return True
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return False
+
+    def _validate_gpu_prereqs(self) -> bool:
+        """
+        Verify NVIDIA Container Toolkit is present before attempting to start
+        the GPU stack. Fails early with a clear install link rather than letting
+        Docker Compose produce a cryptic runtime error deep in the vLLM startup.
+        """
+        if self._has_nvidia_support():
+            self.log.info("NVIDIA GPU support confirmed.")
+            return True
+
+        typer.echo(
+            "\nGPU stack requested (--gpu) but NVIDIA drivers / nvidia-smi not found.\n"
+            "Requirements for GPU stack:\n"
+            "  1. NVIDIA GPU with drivers installed\n"
+            f"  2. NVIDIA Container Toolkit: {_NVIDIA_TOOLKIT_INSTALL_URL}\n"
+            "\nTo start without GPU services, omit --gpu:\n"
+            "  pdavid --mode up\n"
+            "Or exclude only the GPU services:\n"
+            "  pdavid --mode up --exclude vllm --exclude ollama\n",
+            err=True,
+        )
+        return False
+
+    def _preflight(self) -> bool:
+        """
+        Run all dependency checks before attempting any Docker operations.
+        Returns True only if every required dependency is satisfied.
+        Checks are ordered so the most fundamental failure is reported first.
+        """
+        self.log.debug("Running preflight dependency checks...")
+        if not self._has_docker():
+            return False
+        if not self._has_docker_compose():
+            return False
+        if getattr(self.args, "gpu", False) and not self._validate_gpu_prereqs():
+            return False
+        self.log.debug("Preflight checks passed.")
+        return True
+
+    # ------------------------------------------------------------------
     # Utilities
     # ------------------------------------------------------------------
 
@@ -333,6 +440,12 @@ class Orchestrator:
         if getattr(self.args, "gpu", False):
             files += ["-f", self.gpu_compose]
         return files
+
+    def _get_all_services(self) -> List[str]:
+        """Return every service name declared in the base compose file."""
+        if not self.compose_config:
+            return []
+        return list(self.compose_config.get("services", {}).keys())
 
     def _run_command(
         self, cmd_list, check=True, capture_output=False, text=True, suppress_logs=False, **kwargs
@@ -431,7 +544,7 @@ class Orchestrator:
         if not sys.stdin.isatty():
             self.log.warning(
                 "Non-interactive environment. User-required variables left blank: %s. "
-                "Set them with: platform configure --set KEY=VALUE",
+                "Set them with: pdavid configure --set KEY=VALUE",
                 ", ".join(needs_prompt.keys()),
             )
             return
@@ -445,8 +558,8 @@ class Orchestrator:
             "  them, but related features will be unavailable until set.\n"
             "\n"
             "  Set them any time later with:\n"
-            "    platform configure --interactive\n"
-            "    platform configure --set KEY=value\n"
+            "    pdavid configure --interactive\n"
+            "    pdavid configure --set KEY=value\n"
         )
         for key, (label, help_text, hide) in needs_prompt.items():
             typer.echo(f"  {help_text}\n")
@@ -461,7 +574,7 @@ class Orchestrator:
                 generation_log[key] = "Provided interactively by user"
                 typer.echo(f"  {key} saved.\n")
             else:
-                self.log.warning("'%s' skipped. Run: platform configure --set %s=<value>", key, key)
+                self.log.warning("'%s' skipped. Run: pdavid configure --set %s=<value>", key, key)
         typer.echo("=" * 60 + "\n")
 
     def _generate_dot_env_file(self):
@@ -519,8 +632,8 @@ class Orchestrator:
         env_lines = [
             f"# Auto-generated by projectdavid-platform — {time.strftime('%Y-%m-%d %H:%M:%S %Z')}",
             "# Update optional values any time with:",
-            "#   platform configure --set HF_TOKEN=<token>",
-            "#   platform configure --interactive",
+            "#   pdavid configure --set HF_TOKEN=<token>",
+            "#   pdavid configure --interactive",
             "",
         ]
         processed: set = set()
@@ -576,9 +689,9 @@ class Orchestrator:
         typer.echo("=" * 60)
         typer.echo(
             "\n  Use ADMIN_API_KEY for provisioning commands:\n"
-            "    platform bootstrap-admin\n"
-            "    platform create-user\n"
-            "    platform setup-assistant\n"
+            "    pdavid bootstrap-admin\n"
+            "    pdavid create-user\n"
+            "    pdavid setup-assistant\n"
         )
 
     def _check_for_required_env_file(self):
@@ -614,7 +727,7 @@ class Orchestrator:
             self.log.info("Defaulting HF_CACHE_PATH to: %s", hf_path)
 
     # ------------------------------------------------------------------
-    # Validation
+    # Secret validation
     # ------------------------------------------------------------------
 
     def _validate_secrets(self):
@@ -631,24 +744,16 @@ class Orchestrator:
             if not os.environ.get(key, "").strip():
                 self.log.warning(
                     "'%s' not set — vLLM/HuggingFace features unavailable. "
-                    "Set with: platform configure --set %s=<value>",
+                    "Set with: pdavid configure --set %s=<value>",
                     key,
                     key,
                 )
 
     # ------------------------------------------------------------------
-    # Docker helpers
+    # Container checks
     # ------------------------------------------------------------------
 
-    def _has_docker(self) -> bool:
-        if not shutil.which("docker"):
-            self.log.error("Docker not found in PATH.")
-            return False
-        return True
-
     def _is_container_running(self, container_name: str) -> bool:
-        if not self._has_docker():
-            return False
         try:
             result = self._run_command(
                 ["docker", "ps", "--filter", f"name=^{container_name}$", "--format", "{{.Names}}"],
@@ -676,40 +781,81 @@ class Orchestrator:
         if getattr(self.args, "force_recreate", False):
             up_cmd.append("--force-recreate")
 
+        # ── Resolve which services to start, honouring --exclude ──────
+        exclude = set(getattr(self.args, "exclude", None) or [])
+        target = list(getattr(self.args, "services", None) or [])
+
+        if exclude:
+            all_svcs = self._get_all_services()
+            unknown = exclude - set(all_svcs)
+            if unknown:
+                self.log.warning(
+                    "Excluded service(s) not found in compose file (typo?): %s",
+                    ", ".join(sorted(unknown)),
+                )
+            if target:
+                target = [s for s in target if s not in exclude]
+            else:
+                target = [s for s in all_svcs if s not in exclude]
+            self.log.info(
+                "Starting services (excluding %s): %s",
+                ", ".join(sorted(exclude)),
+                ", ".join(target),
+            )
+        # ──────────────────────────────────────────────────────────────
+
+        if target:
+            up_cmd.extend(target)
+
         try:
             self._run_command(up_cmd, check=True)
             self.log.info("Stack started successfully.")
             if not getattr(self.args, "attached", False):
-                self.log.info(
-                    "View logs: docker compose %s logs -f --tail=50",
-                    " ".join(self._compose_files()),
+                logs_hint = (
+                    ["docker", "compose"] + self._compose_files() + ["logs", "-f", "--tail=50"]
                 )
+                if target:
+                    logs_hint.extend(target)
+                self.log.info("View logs: %s", " ".join(logs_hint))
         except subprocess.CalledProcessError:
             raise SystemExit(1)
 
     def _handle_down(self):
+        target_services = getattr(self.args, "services", None) or []
         down_cmd = ["docker", "compose"] + self._compose_files() + ["down", "--remove-orphans"]
         if getattr(self.args, "clear_volumes", False):
             down_cmd.append("--volumes")
+        if target_services:
+            down_cmd.extend(target_services)
         self._run_command(down_cmd, check=False)
 
     def _handle_build(self):
+        target_services = getattr(self.args, "services", None) or []
         build_cmd = ["docker", "compose"] + self._compose_files() + ["build"]
         if getattr(self.args, "no_cache", False):
             build_cmd.append("--no-cache")
         if getattr(self.args, "parallel", False):
             build_cmd.append("--parallel")
+        if target_services:
+            build_cmd.extend(target_services)
         try:
             self._run_command(build_cmd, check=True)
         except subprocess.CalledProcessError:
             raise SystemExit(1)
 
     def _handle_logs(self):
+        target_services = getattr(self.args, "services", None) or []
         logs_cmd = ["docker", "compose"] + self._compose_files() + ["logs"]
         if getattr(self.args, "follow", False):
             logs_cmd.append("-f")
         if getattr(self.args, "tail", None):
             logs_cmd.extend(["--tail", str(self.args.tail)])
+        if getattr(self.args, "timestamps", False):
+            logs_cmd.append("-t")
+        if getattr(self.args, "no_log_prefix", False):
+            logs_cmd.append("--no-log-prefix")
+        if target_services:
+            logs_cmd.extend(target_services)
         try:
             self._run_command(logs_cmd, check=False)
         except KeyboardInterrupt:
@@ -739,7 +885,7 @@ class Orchestrator:
     def _ensure_api_running(self, action: str):
         if not self._is_container_running(API_CONTAINER_NAME):
             self.log.error(
-                "Container '%s' is not running. Start the stack first:\n" "  platform --mode up",
+                "Container '%s' is not running. Start the stack first:\n" "  pdavid --mode up",
                 API_CONTAINER_NAME,
             )
             raise SystemExit(1)
@@ -826,10 +972,14 @@ class Orchestrator:
         self.log.info("Mode: %s%s", mode, " + GPU" if getattr(self.args, "gpu", False) else "")
 
         if getattr(self.args, "nuke", False):
+            # Preflight still needed for nuke — we call docker commands
+            if not self._preflight():
+                raise SystemExit(1)
             self._handle_nuke()
             return
 
-        if not self._has_docker():
+        # All other modes require Docker + Compose (and optionally GPU toolkit)
+        if not self._preflight():
             raise SystemExit(1)
 
         if mode == "logs":
@@ -860,39 +1010,74 @@ class Orchestrator:
 def main(
     ctx: typer.Context,
     mode: str = typer.Option(
-        "up", "--mode", help="Stack action: up | build | both | down_only | logs"
+        "up",
+        "--mode",
+        help="Stack action: up | build | both | down_only | logs",
+        show_default=True,
     ),
     gpu: bool = typer.Option(
-        False, "--gpu", help="Include GPU services (vLLM + Ollama) via docker-compose.gpu.yml."
+        False,
+        "--gpu",
+        help="Include GPU services (vLLM + Ollama) via docker-compose.gpu.yml.",
     ),
+    # --- Targeting ---
+    services: Optional[List[str]] = typer.Option(
+        None,
+        "--services",
+        help="Target specific service(s). Repeat for multiple: --services api --services db",
+    ),
+    exclude: Optional[List[str]] = typer.Option(
+        None,
+        "--exclude",
+        "-x",
+        help=(
+            "Exclude service(s) from 'up'. " "Repeat for multiple: --exclude vllm --exclude ollama"
+        ),
+    ),
+    # --- Up ---
     down: bool = typer.Option(False, "--down", help="Run 'down' before starting."),
     clear_volumes: bool = typer.Option(
         False, "--clear-volumes", "-v", help="Remove volumes on down."
     ),
-    nuke: bool = typer.Option(
-        False, "--nuke", help="DANGER: destroy all stack data. Requires confirmation."
-    ),
-    build_before_up: bool = typer.Option(False, "--build-before-up", help="Build before up."),
     force_recreate: bool = typer.Option(
         False, "--force-recreate", help="Force-recreate containers."
     ),
     attached: bool = typer.Option(False, "--attached", "-a", help="Run up in foreground."),
-    follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output."),
-    tail: Optional[int] = typer.Option(None, "--tail", help="Number of log lines to show."),
+    build_before_up: bool = typer.Option(False, "--build-before-up", help="Build before up."),
+    # --- Build ---
     no_cache: bool = typer.Option(False, "--no-cache", help="Build without cache."),
     parallel: bool = typer.Option(False, "--parallel", help="Build images in parallel."),
+    # --- Down ---
+    nuke: bool = typer.Option(
+        False,
+        "--nuke",
+        help="DANGER: destroy all stack data. Requires confirmation.",
+    ),
+    # --- Logs ---
+    follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output."),
+    tail: Optional[int] = typer.Option(None, "--tail", help="Number of log lines to show."),
+    timestamps: bool = typer.Option(
+        False, "--timestamps", "-t", help="Show timestamps in log output."
+    ),
+    no_log_prefix: bool = typer.Option(
+        False, "--no-log-prefix", help="Omit service name prefix in logs."
+    ),
+    # --- Misc ---
     verbose: bool = typer.Option(False, "--verbose", help="Enable debug logging."),
 ) -> None:
     """
     Manage the Project David / Entities platform stack.
 
     Examples:\n
-      platform --mode up\n
-      platform --mode up --gpu\n
-      platform --mode up --down --clear-volumes\n
-      platform --mode logs --follow\n
-      platform configure --set HF_TOKEN=hf_abc123\n
-      platform bootstrap-admin\n
+      pdavid --mode up\n
+      pdavid --mode up --gpu\n
+      pdavid --mode up --exclude vllm --exclude ollama\n
+      pdavid --mode up --services api db qdrant\n
+      pdavid --mode up --down --clear-volumes\n
+      pdavid --mode logs --follow --timestamps\n
+      pdavid --mode logs --services api --tail 100\n
+      pdavid configure --set HF_TOKEN=hf_abc123\n
+      pdavid bootstrap-admin\n
     """
     if ctx.invoked_subcommand is not None:
         return
@@ -905,22 +1090,33 @@ def main(
         )
         raise SystemExit(1)
 
+    if exclude and mode not in ("up", "both"):
+        typer.echo(
+            f"[error] --exclude is only valid with --mode=up or --mode=both (got '{mode}').",
+            err=True,
+        )
+        raise SystemExit(1)
+
     if clear_volumes:
         down = True
 
     args = SimpleNamespace(
         mode=mode,
         gpu=gpu,
+        services=services or [],
+        exclude=exclude or [],
         down=down,
         clear_volumes=clear_volumes,
-        nuke=nuke,
-        build_before_up=build_before_up,
         force_recreate=force_recreate,
         attached=attached,
-        follow=follow,
-        tail=tail,
+        build_before_up=build_before_up,
         no_cache=no_cache,
         parallel=parallel,
+        nuke=nuke,
+        follow=follow,
+        tail=tail,
+        timestamps=timestamps,
+        no_log_prefix=no_log_prefix,
         verbose=verbose,
     )
 
@@ -950,14 +1146,14 @@ def configure(
     Update variables in an existing .env without regenerating secrets.
 
     Examples:\n
-      platform configure --set HF_TOKEN=hf_abc123\n
-      platform configure --set VLLM_MODEL=Qwen/Qwen2.5-VL-7B-Instruct\n
-      platform configure --interactive\n
+      pdavid configure --set HF_TOKEN=hf_abc123\n
+      pdavid configure --set VLLM_MODEL=Qwen/Qwen2.5-VL-7B-Instruct\n
+      pdavid configure --interactive\n
     """
     env_path = Path(Orchestrator._ENV_FILE)
     if not env_path.exists():
         typer.echo(
-            f"[error] '{Orchestrator._ENV_FILE}' not found. " "Run 'platform --mode up' first.",
+            f"[error] '{Orchestrator._ENV_FILE}' not found. " "Run 'pdavid --mode up' first.",
             err=True,
         )
         raise SystemExit(1)
@@ -995,7 +1191,7 @@ def configure(
     if not updates:
         typer.echo(
             "Nothing to update. Use --set KEY=VALUE or --interactive.\n"
-            "Example: platform configure --set HF_TOKEN=hf_abc123"
+            "Example: pdavid configure --set HF_TOKEN=hf_abc123"
         )
         raise SystemExit(0)
 
@@ -1010,7 +1206,7 @@ def configure(
         if pattern.search(content):
             content = pattern.sub(new_line, content)
         else:
-            content += f"\n# Added by platform configure\n{new_line}\n"
+            content += f"\n# Added by pdavid configure\n{new_line}\n"
 
     env_path.write_text(content, encoding="utf-8")
     typer.echo(f"Updated {len(updates)} variable(s): {', '.join(updates.keys())}")
@@ -1022,17 +1218,17 @@ def configure(
         typer.echo(
             f"\nWARNING: {', '.join(dangerous)} cannot be safely rotated on a live stack.\n"
             "  Back up your data, then:\n"
-            "    platform --down --clear-volumes\n"
-            "    platform --mode up"
+            "    pdavid --down --clear-volumes\n"
+            "    pdavid --mode up"
         )
     elif requires_down:
         typer.echo(
             f"\n  Note: {', '.join(requires_down)} require a full restart:\n"
-            "    platform --down\n"
-            "    platform --mode up"
+            "    pdavid --down\n"
+            "    pdavid --mode up"
         )
     else:
-        typer.echo("\n  Restart to apply: platform --mode up --force-recreate")
+        typer.echo("\n  Restart to apply: pdavid --mode up --force-recreate")
 
 
 @app.command(name="bootstrap-admin")
@@ -1086,7 +1282,7 @@ def setup_assistant(
     Requires admin API key and user ID from a completed bootstrap-admin run.
 
     Example:\n
-      platform setup-assistant --api-key ad_... --user-id usr_...
+      pdavid setup-assistant --api-key ad_... --user-id usr_...
     """
     args = SimpleNamespace(verbose=verbose, gpu=False)
     o = Orchestrator(args)

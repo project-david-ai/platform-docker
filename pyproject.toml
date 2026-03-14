@@ -21,8 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-# Primary CLI entry point
-platform = "start_orchestration:entry_point"
+pdavid = "start_orchestration:entry_point"
 
 [project.optional-dependencies]
 dev = [
