@@ -950,12 +950,18 @@ class Orchestrator:
     def exec_bootstrap_admin(self, db_url: Optional[str] = None):
         self._ensure_api_running("bootstrap-admin")
         cmd = [
-            "docker", "compose",
-            "--project-directory", str(Path.cwd()),
-            "--env-file", self._env_file_abs,
-            "-f", self.base_compose,
-            "exec", API_SERVICE_NAME,
-            "python", "/app/scripts/bootstrap_admin.py",
+            "docker",
+            "compose",
+            "--project-directory",
+            str(Path.cwd()),
+            "--env-file",
+            self._env_file_abs,
+            "-f",
+            self.base_compose,
+            "exec",
+            API_SERVICE_NAME,
+            "python",
+            "/app/scripts/bootstrap_admin.py",
         ]
         if db_url:
             cmd.extend(["--db-url", db_url])
@@ -975,12 +981,18 @@ class Orchestrator:
     ):
         self._ensure_api_running("create-user")
         cmd = [
-            "docker", "compose",
-            "--project-directory", str(Path.cwd()),
-            "--env-file", self._env_file_abs,
-            "-f", self.base_compose,
-            "exec", API_SERVICE_NAME,
-            "python", "/app/scripts/create_user.py",
+            "docker",
+            "compose",
+            "--project-directory",
+            str(Path.cwd()),
+            "--env-file",
+            self._env_file_abs,
+            "-f",
+            self.base_compose,
+            "exec",
+            API_SERVICE_NAME,
+            "python",
+            "/app/scripts/create_user.py",
         ]
         if email:
             cmd.extend(["--email", email])
@@ -997,14 +1009,22 @@ class Orchestrator:
     def exec_setup_assistant(self, api_key: str, user_id: str):
         self._ensure_api_running("setup-assistant")
         cmd = [
-            "docker", "compose",
-            "--project-directory", str(Path.cwd()),
-            "--env-file", self._env_file_abs,
-            "-f", self.base_compose,
-            "exec", API_SERVICE_NAME,
-            "python", "/app/scripts/bootstrap_default_assistant.py",
-            "--api-key", api_key,
-            "--user-id", user_id,
+            "docker",
+            "compose",
+            "--project-directory",
+            str(Path.cwd()),
+            "--env-file",
+            self._env_file_abs,
+            "-f",
+            self.base_compose,
+            "exec",
+            API_SERVICE_NAME,
+            "python",
+            "/app/scripts/bootstrap_default_assistant.py",
+            "--api-key",
+            api_key,
+            "--user-id",
+            user_id,
         ]
         try:
             self._run_command(cmd, check=True, suppress_logs=True)
@@ -1057,20 +1077,25 @@ class Orchestrator:
 def main(
     ctx: typer.Context,
     mode: str = typer.Option(
-        "up", "--mode",
+        "up",
+        "--mode",
         help="Stack action: up | build | both | down_only | logs",
         show_default=True,
     ),
     gpu: bool = typer.Option(
-        False, "--gpu",
+        False,
+        "--gpu",
         help="Include GPU services (vLLM + Ollama) via docker-compose.gpu.yml.",
     ),
     services: Optional[List[str]] = typer.Option(
-        None, "--services",
+        None,
+        "--services",
         help="Target specific service(s). Repeat for multiple: --services api --services db",
     ),
     exclude: Optional[List[str]] = typer.Option(
-        None, "--exclude", "-x",
+        None,
+        "--exclude",
+        "-x",
         help="Exclude service(s) from 'up'. Repeat for multiple: --exclude vllm --exclude ollama",
     ),
     down: bool = typer.Option(False, "--down", help="Run 'down' before starting."),
@@ -1085,7 +1110,8 @@ def main(
     no_cache: bool = typer.Option(False, "--no-cache", help="Build without cache."),
     parallel: bool = typer.Option(False, "--parallel", help="Build images in parallel."),
     nuke: bool = typer.Option(
-        False, "--nuke",
+        False,
+        "--nuke",
         help="DANGER: destroy all stack data. Requires confirmation.",
     ),
     follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output."),
@@ -1118,8 +1144,7 @@ def main(
     valid_modes = {"up", "build", "both", "down_only", "logs"}
     if mode not in valid_modes:
         typer.echo(
-            f"[error] Invalid --mode '{mode}'. "
-            f"Choose from: {', '.join(sorted(valid_modes))}",
+            f"[error] Invalid --mode '{mode}'. " f"Choose from: {', '.join(sorted(valid_modes))}",
             err=True,
         )
         raise SystemExit(1)
@@ -1135,14 +1160,22 @@ def main(
         down = True
 
     args = SimpleNamespace(
-        mode=mode, gpu=gpu,
-        services=services or [], exclude=exclude or [],
-        down=down, clear_volumes=clear_volumes,
-        force_recreate=force_recreate, attached=attached,
+        mode=mode,
+        gpu=gpu,
+        services=services or [],
+        exclude=exclude or [],
+        down=down,
+        clear_volumes=clear_volumes,
+        force_recreate=force_recreate,
+        attached=attached,
         build_before_up=build_before_up,
-        no_cache=no_cache, parallel=parallel,
+        no_cache=no_cache,
+        parallel=parallel,
         nuke=nuke,
-        follow=follow, tail=tail, timestamps=timestamps, no_log_prefix=no_log_prefix,
+        follow=follow,
+        tail=tail,
+        timestamps=timestamps,
+        no_log_prefix=no_log_prefix,
         verbose=verbose,
     )
 
@@ -1165,8 +1198,7 @@ def configure(
         None, "--set", "-s", help="Set KEY=VALUE in .env.", metavar="KEY=VALUE"
     ),
     interactive: bool = typer.Option(
-        False, "--interactive", "-i",
-        help="Interactively prompt for user-required variables."
+        False, "--interactive", "-i", help="Interactively prompt for user-required variables."
     ),
 ) -> None:
     """
@@ -1180,8 +1212,7 @@ def configure(
     env_path = Path(Orchestrator._ENV_FILE)
     if not env_path.exists():
         typer.echo(
-            f"[error] '{Orchestrator._ENV_FILE}' not found. "
-            "Run 'pdavid --mode up' first.",
+            f"[error] '{Orchestrator._ENV_FILE}' not found. " "Run 'pdavid --mode up' first.",
             err=True,
         )
         raise SystemExit(1)
