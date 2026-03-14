@@ -77,8 +77,6 @@ class TestSecretUniqueness:
 # ---------------------------------------------------------------------------
 # No insecure values survive
 # ---------------------------------------------------------------------------
-
-
 class TestNoInsecureValues:
     def test_insecure_values_not_present_in_generated_env(self, generated_env):
         insecure = [
