@@ -125,7 +125,7 @@ celerybeat.pid
 
 # Environments
 .env
-!.env.example
+!projectdavid_platform/.env.example
 .venv
 env/
 venv/

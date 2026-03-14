@@ -81,6 +81,14 @@ BASE_COMPOSE_FILE = "docker-compose.yml"
 GPU_COMPOSE_FILE = "docker-compose.gpu.yml"
 PACKAGE_NAME = "projectdavid_platform"
 
+# Bundled config files that must exist in the user's CWD before Docker Compose
+# can start. Each entry is (package-relative path, CWD-relative destination).
+_BUNDLED_CONFIGS = [
+    ("docker/nginx/nginx.conf", "docker/nginx/nginx.conf"),
+    ("docker/otel/otel-config.yaml", "docker/otel/otel-config.yaml"),
+    ("docker/searxng/settings.yml", "docker/searxng/settings.yml"),
+]
+
 # Platform-specific Docker install URLs
 _DOCKER_INSTALL_URLS = {
     "windows": "https://docs.docker.com/desktop/install/windows-install/",
@@ -336,6 +344,7 @@ class Orchestrator:
         self._configure_shared_path()
         self._configure_hf_cache_path()
         self._ensure_dockerignore()
+        self._ensure_config_files()
 
     # ------------------------------------------------------------------
     # .env path helpers
@@ -346,23 +355,80 @@ class Orchestrator:
         """
         Absolute path to the .env file in the current working directory.
         Always resolves from CWD so Docker Compose receives a fully-qualified
-        path regardless of where the bundled compose file lives (e.g. inside
-        site-packages after a pip install).
+        path regardless of where the bundled compose file lives.
         """
         return str(Path(self._ENV_FILE).resolve())
+
+    # ------------------------------------------------------------------
+    # Config file bootstrap
+    # ------------------------------------------------------------------
+
+    def _ensure_config_files(self) -> None:
+        """
+        Copy bundled service config files (nginx, otel, searxng) into the
+        user's CWD the first time pdavid runs.
+
+        Rules:
+        - Never overwrites an existing file — local customisations are
+          always respected.
+        - Skips silently if the package data cannot be located (e.g. a
+          partial or editable install without the data files present).
+        - Creates the full directory tree as needed.
+
+        The compose file mounts these paths as read-only volumes:
+          ./docker/nginx/nginx.conf
+          ./docker/otel/otel-config.yaml
+          ./docker/searxng/settings.yml
+        Docker Compose resolves them relative to --project-directory (CWD),
+        so they must be present there before `docker compose up` runs.
+        """
+        copied = []
+        skipped = []
+
+        for pkg_rel, cwd_rel in _BUNDLED_CONFIGS:
+            dest = Path.cwd() / cwd_rel
+            if dest.exists():
+                skipped.append(cwd_rel)
+                self.log.debug("Config file already present — skipping: %s", cwd_rel)
+                continue
+
+            try:
+                pkg_files = importlib.resources.files(PACKAGE_NAME)
+                # pkg_rel uses forward slashes; traverse the package tree
+                resource = pkg_files
+                for part in pkg_rel.split("/"):
+                    resource = resource / part
+
+                with importlib.resources.as_file(resource) as src:
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src, dest)
+                    copied.append(cwd_rel)
+                    self.log.info("Installed config: %s", cwd_rel)
+
+            except Exception as e:
+                self.log.warning(
+                    "Could not install bundled config '%s': %s. "
+                    "The service that depends on it may fail to start. "
+                    "You can create it manually or reinstall: "
+                    "pip install --force-reinstall projectdavid-platform",
+                    cwd_rel,
+                    e,
+                )
+
+        if copied:
+            typer.echo(
+                f"\n  Installed {len(copied)} config file(s) to CWD:\n"
+                + "\n".join(f"    {f}" for f in copied)
+                + "\n  Edit them freely — pdavid will never overwrite local copies.\n"
+            )
 
     # ------------------------------------------------------------------
     # Preflight dependency checks
     # ------------------------------------------------------------------
 
     def _has_docker(self) -> bool:
-        """
-        Check Docker is installed and in PATH.
-        Prints a platform-specific install URL if missing — never auto-installs.
-        """
         if shutil.which("docker"):
             return True
-
         system = _platform.system().lower()
         install_url = _DOCKER_INSTALL_URLS.get(system, "https://docs.docker.com/get-docker/")
         typer.echo(
@@ -374,10 +440,6 @@ class Orchestrator:
         return False
 
     def _has_docker_compose(self) -> bool:
-        """
-        Check the Docker Compose plugin is available.
-        Docker Desktop bundles it; headless Linux installs often do not.
-        """
         try:
             self._run_command(
                 ["docker", "compose", "version"],
@@ -396,7 +458,6 @@ class Orchestrator:
             return False
 
     def _has_nvidia_support(self) -> bool:
-        """Check for nvidia-smi — presence implies NVIDIA drivers are installed."""
         cmd = shutil.which("nvidia-smi")
         if not cmd:
             return False
@@ -407,15 +468,9 @@ class Orchestrator:
             return False
 
     def _validate_gpu_prereqs(self) -> bool:
-        """
-        Verify NVIDIA Container Toolkit is present before attempting to start
-        the GPU stack. Fails early with a clear install link rather than letting
-        Docker Compose produce a cryptic runtime error deep in the vLLM startup.
-        """
         if self._has_nvidia_support():
             self.log.info("NVIDIA GPU support confirmed.")
             return True
-
         typer.echo(
             "\nGPU stack requested (--gpu) but NVIDIA drivers / nvidia-smi not found.\n"
             "Requirements for GPU stack:\n"
@@ -430,11 +485,6 @@ class Orchestrator:
         return False
 
     def _preflight(self) -> bool:
-        """
-        Run all dependency checks before attempting any Docker operations.
-        Returns True only if every required dependency is satisfied.
-        Checks are ordered so the most fundamental failure is reported first.
-        """
         self.log.debug("Running preflight dependency checks...")
         if not self._has_docker():
             return False
@@ -450,17 +500,6 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _compose_files(self) -> List[str]:
-        """
-        Build the flag fragment inserted before every docker compose sub-command.
-
-        --project-directory anchors ALL relative path resolution (env_file:,
-        volume mounts, build contexts) to the user's CWD, regardless of where
-        the bundled compose file physically lives (e.g. inside site-packages
-        after a pip install).
-
-        --env-file supplies the absolute path to the CWD .env for variable
-        substitution, as a belt-and-suspenders complement to --project-directory.
-        """
         files = [
             "--project-directory",
             str(Path.cwd()),
@@ -474,7 +513,6 @@ class Orchestrator:
         return files
 
     def _get_all_services(self) -> List[str]:
-        """Return every service name declared in the base compose file."""
         if not self.compose_config:
             return []
         return list(self.compose_config.get("services", {}).keys())
@@ -550,11 +588,6 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _prompt_user_required(self, env_values: dict, generation_log: dict):
-        """
-        Inherit user-required values from the shell environment first.
-        Only prompt interactively for what remains unset.
-        Skips all prompts silently in non-interactive (CI) environments.
-        """
         inherited = {}
         needs_prompt = {}
         for key, meta in self._USER_REQUIRED.items():
@@ -614,7 +647,6 @@ class Orchestrator:
         env_values = dict(self._DEFAULT_VALUES)
         generation_log = {k: "Default value" for k in env_values}
 
-        # Step 1 — force-generate all secrets
         for key in self._GENERATED_SECRETS:
             if key == "ADMIN_API_KEY":
                 env_values[key] = f"ad_{secrets.token_urlsafe(32)}"
@@ -624,12 +656,10 @@ class Orchestrator:
                 env_values[key] = secrets.token_hex(32)
             generation_log[key] = "Generated new secret (forced)"
 
-        # Step 2 — tool IDs
         for key in self._GENERATED_TOOL_IDS:
             env_values[key] = f"tool_{secrets.token_hex(10)}"
             generation_log[key] = "Generated new tool ID"
 
-        # Step 3 — composite DB URLs
         db_user = env_values.get("MYSQL_USER")
         db_pass = env_values.get("MYSQL_PASSWORD")
         db_host = env_values.get("MYSQL_HOST", DEFAULT_DB_SERVICE_NAME)
@@ -650,17 +680,14 @@ class Orchestrator:
                 )
                 generation_log["SPECIAL_DB_URL"] = f"Constructed using host port ({host_port})"
 
-        # Step 4 — HF_CACHE_PATH
         if not env_values.get("HF_CACHE_PATH"):
             env_values["HF_CACHE_PATH"] = os.path.join(
                 os.path.expanduser("~"), ".cache", "huggingface"
             )
             generation_log["HF_CACHE_PATH"] = f"Auto-resolved for {_platform.system()}"
 
-        # Step 5 — interactive prompts for user-required values
         self._prompt_user_required(env_values, generation_log)
 
-        # Step 6 — write
         env_lines = [
             f"# Auto-generated by projectdavid-platform — {time.strftime('%Y-%m-%d %H:%M:%S %Z')}",
             "# Update optional values any time with:",
@@ -766,7 +793,9 @@ class Orchestrator:
         failed = False
         for key in self._GENERATED_SECRETS:
             if os.environ.get(key, "") in self._INSECURE_VALUES:
-                self.log.error("Insure value for '%s'. Delete .env and re-run to regenerate.", key)
+                self.log.error(
+                    "Insecure value for '%s'. Delete .env and re-run to regenerate.", key
+                )
                 failed = True
         if failed:
             raise SystemExit(1)
@@ -811,7 +840,6 @@ class Orchestrator:
         if getattr(self.args, "force_recreate", False):
             up_cmd.append("--force-recreate")
 
-        # ── Resolve which services to start, honouring --exclude ──────
         exclude = set(getattr(self.args, "exclude", None) or [])
         target = list(getattr(self.args, "services", None) or [])
 
@@ -832,7 +860,6 @@ class Orchestrator:
                 ", ".join(sorted(exclude)),
                 ", ".join(target),
             )
-        # ──────────────────────────────────────────────────────────────
 
         if target:
             up_cmd.extend(target)
@@ -915,7 +942,7 @@ class Orchestrator:
     def _ensure_api_running(self, action: str):
         if not self._is_container_running(API_CONTAINER_NAME):
             self.log.error(
-                "Container '%s' is not running. Start the stack first:\n" "  pdavid --mode up",
+                "Container '%s' is not running. Start the stack first:\n  pdavid --mode up",
                 API_CONTAINER_NAME,
             )
             raise SystemExit(1)
@@ -923,18 +950,12 @@ class Orchestrator:
     def exec_bootstrap_admin(self, db_url: Optional[str] = None):
         self._ensure_api_running("bootstrap-admin")
         cmd = [
-            "docker",
-            "compose",
-            "--project-directory",
-            str(Path.cwd()),
-            "--env-file",
-            self._env_file_abs,
-            "-f",
-            self.base_compose,
-            "exec",
-            API_SERVICE_NAME,
-            "python",
-            "/app/scripts/bootstrap_admin.py",
+            "docker", "compose",
+            "--project-directory", str(Path.cwd()),
+            "--env-file", self._env_file_abs,
+            "-f", self.base_compose,
+            "exec", API_SERVICE_NAME,
+            "python", "/app/scripts/bootstrap_admin.py",
         ]
         if db_url:
             cmd.extend(["--db-url", db_url])
@@ -954,18 +975,12 @@ class Orchestrator:
     ):
         self._ensure_api_running("create-user")
         cmd = [
-            "docker",
-            "compose",
-            "--project-directory",
-            str(Path.cwd()),
-            "--env-file",
-            self._env_file_abs,
-            "-f",
-            self.base_compose,
-            "exec",
-            API_SERVICE_NAME,
-            "python",
-            "/app/scripts/create_user.py",
+            "docker", "compose",
+            "--project-directory", str(Path.cwd()),
+            "--env-file", self._env_file_abs,
+            "-f", self.base_compose,
+            "exec", API_SERVICE_NAME,
+            "python", "/app/scripts/create_user.py",
         ]
         if email:
             cmd.extend(["--email", email])
@@ -982,22 +997,14 @@ class Orchestrator:
     def exec_setup_assistant(self, api_key: str, user_id: str):
         self._ensure_api_running("setup-assistant")
         cmd = [
-            "docker",
-            "compose",
-            "--project-directory",
-            str(Path.cwd()),
-            "--env-file",
-            self._env_file_abs,
-            "-f",
-            self.base_compose,
-            "exec",
-            API_SERVICE_NAME,
-            "python",
-            "/app/scripts/bootstrap_default_assistant.py",
-            "--api-key",
-            api_key,
-            "--user-id",
-            user_id,
+            "docker", "compose",
+            "--project-directory", str(Path.cwd()),
+            "--env-file", self._env_file_abs,
+            "-f", self.base_compose,
+            "exec", API_SERVICE_NAME,
+            "python", "/app/scripts/bootstrap_default_assistant.py",
+            "--api-key", api_key,
+            "--user-id", user_id,
         ]
         try:
             self._run_command(cmd, check=True, suppress_logs=True)
@@ -1014,13 +1021,11 @@ class Orchestrator:
         self.log.info("Mode: %s%s", mode, " + GPU" if getattr(self.args, "gpu", False) else "")
 
         if getattr(self.args, "nuke", False):
-            # Preflight still needed for nuke — we call docker commands
             if not self._preflight():
                 raise SystemExit(1)
             self._handle_nuke()
             return
 
-        # All other modes require Docker + Compose (and optionally GPU toolkit)
         if not self._preflight():
             raise SystemExit(1)
 
@@ -1052,31 +1057,22 @@ class Orchestrator:
 def main(
     ctx: typer.Context,
     mode: str = typer.Option(
-        "up",
-        "--mode",
+        "up", "--mode",
         help="Stack action: up | build | both | down_only | logs",
         show_default=True,
     ),
     gpu: bool = typer.Option(
-        False,
-        "--gpu",
+        False, "--gpu",
         help="Include GPU services (vLLM + Ollama) via docker-compose.gpu.yml.",
     ),
-    # --- Targeting ---
     services: Optional[List[str]] = typer.Option(
-        None,
-        "--services",
+        None, "--services",
         help="Target specific service(s). Repeat for multiple: --services api --services db",
     ),
     exclude: Optional[List[str]] = typer.Option(
-        None,
-        "--exclude",
-        "-x",
-        help=(
-            "Exclude service(s) from 'up'. " "Repeat for multiple: --exclude vllm --exclude ollama"
-        ),
+        None, "--exclude", "-x",
+        help="Exclude service(s) from 'up'. Repeat for multiple: --exclude vllm --exclude ollama",
     ),
-    # --- Up ---
     down: bool = typer.Option(False, "--down", help="Run 'down' before starting."),
     clear_volumes: bool = typer.Option(
         False, "--clear-volumes", "-v", help="Remove volumes on down."
@@ -1086,16 +1082,12 @@ def main(
     ),
     attached: bool = typer.Option(False, "--attached", "-a", help="Run up in foreground."),
     build_before_up: bool = typer.Option(False, "--build-before-up", help="Build before up."),
-    # --- Build ---
     no_cache: bool = typer.Option(False, "--no-cache", help="Build without cache."),
     parallel: bool = typer.Option(False, "--parallel", help="Build images in parallel."),
-    # --- Down ---
     nuke: bool = typer.Option(
-        False,
-        "--nuke",
+        False, "--nuke",
         help="DANGER: destroy all stack data. Requires confirmation.",
     ),
-    # --- Logs ---
     follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output."),
     tail: Optional[int] = typer.Option(None, "--tail", help="Number of log lines to show."),
     timestamps: bool = typer.Option(
@@ -1104,7 +1096,6 @@ def main(
     no_log_prefix: bool = typer.Option(
         False, "--no-log-prefix", help="Omit service name prefix in logs."
     ),
-    # --- Misc ---
     verbose: bool = typer.Option(False, "--verbose", help="Enable debug logging."),
 ) -> None:
     """
@@ -1127,7 +1118,8 @@ def main(
     valid_modes = {"up", "build", "both", "down_only", "logs"}
     if mode not in valid_modes:
         typer.echo(
-            f"[error] Invalid --mode '{mode}'. " f"Choose from: {', '.join(sorted(valid_modes))}",
+            f"[error] Invalid --mode '{mode}'. "
+            f"Choose from: {', '.join(sorted(valid_modes))}",
             err=True,
         )
         raise SystemExit(1)
@@ -1143,22 +1135,14 @@ def main(
         down = True
 
     args = SimpleNamespace(
-        mode=mode,
-        gpu=gpu,
-        services=services or [],
-        exclude=exclude or [],
-        down=down,
-        clear_volumes=clear_volumes,
-        force_recreate=force_recreate,
-        attached=attached,
+        mode=mode, gpu=gpu,
+        services=services or [], exclude=exclude or [],
+        down=down, clear_volumes=clear_volumes,
+        force_recreate=force_recreate, attached=attached,
         build_before_up=build_before_up,
-        no_cache=no_cache,
-        parallel=parallel,
+        no_cache=no_cache, parallel=parallel,
         nuke=nuke,
-        follow=follow,
-        tail=tail,
-        timestamps=timestamps,
-        no_log_prefix=no_log_prefix,
+        follow=follow, tail=tail, timestamps=timestamps, no_log_prefix=no_log_prefix,
         verbose=verbose,
     )
 
@@ -1181,7 +1165,8 @@ def configure(
         None, "--set", "-s", help="Set KEY=VALUE in .env.", metavar="KEY=VALUE"
     ),
     interactive: bool = typer.Option(
-        False, "--interactive", "-i", help="Interactively prompt for user-required variables."
+        False, "--interactive", "-i",
+        help="Interactively prompt for user-required variables."
     ),
 ) -> None:
     """
@@ -1195,7 +1180,8 @@ def configure(
     env_path = Path(Orchestrator._ENV_FILE)
     if not env_path.exists():
         typer.echo(
-            f"[error] '{Orchestrator._ENV_FILE}' not found. " "Run 'pdavid --mode up' first.",
+            f"[error] '{Orchestrator._ENV_FILE}' not found. "
+            "Run 'pdavid --mode up' first.",
             err=True,
         )
         raise SystemExit(1)
@@ -1329,18 +1315,6 @@ def setup_assistant(
     args = SimpleNamespace(verbose=verbose, gpu=False)
     o = Orchestrator(args)
     o.exec_setup_assistant(api_key=api_key, user_id=user_id)
-
-
-# ---------------------------------------------------------------------------
-# Package structure note
-# ---------------------------------------------------------------------------
-# For importlib.resources to resolve bundled compose files, the package
-# directory projectdavid_platform/ must contain:
-#   - __init__.py
-#   - docker-compose.yml
-#   - docker-compose.gpu.yml
-#   - .env.example
-# ---------------------------------------------------------------------------
 
 
 def entry_point():
