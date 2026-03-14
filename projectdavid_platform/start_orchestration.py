@@ -1028,7 +1028,7 @@ class Orchestrator:
             self._handle_logs()
             return
 
-        if getattr(self.args, "down", False):
+        if mode == "down_only" or getattr(self.args, "down", False):
             self._handle_down()
             if mode == "down_only":
                 return
