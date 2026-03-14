@@ -40,11 +40,14 @@ services:
       # downloads will fail. Set via: entities-dev configure --set HF_TOKEN=hf_abc123
       - HF_TOKEN=${HF_TOKEN}
     volumes:
-      - ${HF_CACHE_PATH:?HF_CACHE_PATH is not set. Run: entities-dev --mode up}:/root/.cache/huggingface
+      # HF_CACHE_PATH uses :- fallback to avoid multi-colon parse error in volume syntax.
+      # The orchestrator always sets this before starting — fallback only fires if
+      # docker compose up is run directly without going through entities-dev.
+      - "${HF_CACHE_PATH:-~/.cache/huggingface}:/root/.cache/huggingface"
     ports:
       - "8001:8000"
     command: >
-      --model ${VLLM_MODEL:?VLLM_MODEL is not set. Run: entities-dev --mode up}
+      --model ${VLLM_MODEL:-Qwen/Qwen2.5-VL-3B-Instruct}
       --dtype float16
       --quantization fp8
       --max-model-len 4096
