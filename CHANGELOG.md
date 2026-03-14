@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/project-david-ai/platform-docker/compare/v1.4.0...v1.5.0) (2026-03-14)
+
+
+### Features
+
+* replace CLI name from `platform` to `pdavid` and enhance stack management options ([835eb21](https://github.com/project-david-ai/platform-docker/commit/835eb21d077a83348cc6aa6af3326b4fc629d3c0))
+
 # [1.4.0](https://github.com/project-david-ai/platform-docker/compare/v1.3.0...v1.4.0) (2026-03-14)
 
 
