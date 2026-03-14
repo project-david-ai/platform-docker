@@ -1,3 +1,10 @@
+## [1.8.1](https://github.com/project-david-ai/platform-docker/compare/v1.8.0...v1.8.1) (2026-03-14)
+
+
+### Bug Fixes
+
+* update file paths and adjust packaging for projectdavid-platform ([755b4ba](https://github.com/project-david-ai/platform-docker/commit/755b4ba571970a3d30d5cad31c20b1c73e07c323))
+
 # [1.8.0](https://github.com/project-david-ai/platform-docker/compare/v1.7.0...v1.8.0) (2026-03-14)
 
 
