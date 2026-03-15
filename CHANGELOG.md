@@ -1,3 +1,10 @@
+## [1.14.1](https://github.com/project-david-ai/platform-docker/compare/v1.14.0...v1.14.1) (2026-03-15)
+
+
+### Bug Fixes
+
+* remove user-related script commands and simplify admin bootstrap ([11114ad](https://github.com/project-david-ai/platform-docker/commit/11114ad681cabbb136be28bed268ea46b6fe11de))
+
 # [1.14.0](https://github.com/project-david-ai/platform-docker/compare/v1.13.0...v1.14.0) (2026-03-15)
 
 
