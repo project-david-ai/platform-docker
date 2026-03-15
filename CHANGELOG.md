@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/project-david-ai/platform-docker/compare/v1.12.1...v1.13.0) (2026-03-15)
+
+
+### Features
+
+* refine README and orchestration setup for clarity and reliability ([71863ea](https://github.com/project-david-ai/platform-docker/commit/71863ea7e9412f3f6a7b8be8ccafbbb37630b7e7))
+
 ## [1.12.1](https://github.com/project-david-ai/platform-docker/compare/v1.12.0...v1.12.1) (2026-03-15)
 
 
