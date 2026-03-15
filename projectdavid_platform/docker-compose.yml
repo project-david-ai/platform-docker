@@ -90,15 +90,11 @@ services:
       - my_custom_network
 
   api:
-    # Image tag is pinned to the installed package version via PDAVID_VERSION.
-    # PDAVID_VERSION is written to .env automatically by the orchestrator on
-    # every run — do not edit it manually.
-    # To upgrade: pip install --upgrade projectdavid-platform
-    #             pdavid --mode up --force-recreate
-    #
-    # Scripts (bootstrap_admin.py, create_user.py etc.) are baked into the
-    # image at /app/scripts — do NOT mount a local scripts directory over them.
-    image: thanosprime/entities-api-api:${PDAVID_VERSION:-latest}
+    # Pre-built image from Docker Hub.
+    # Always uses :latest — run `pdavid --mode up --pull` to get the newest version.
+    # Scripts are baked into the image at /app/src — do NOT mount a local
+    # scripts directory over them.
+    image: thanosprime/entities-api-api:latest
     container_name: fastapi_cosmic_catalyst
     restart: always
     env_file:
@@ -119,8 +115,8 @@ services:
       - OTEL_METRICS_EXPORTER=none
       - OTEL_LOGS_EXPORTER=none
       # Ollama and vLLM are GPU-only — localhost stubs used here.
-      # Overridden with real internal URLs by docker-compose.gpu.yml
-      # when pdavid --mode up --gpu is used.
+      # Overridden with real internal URLs by the GPU overlays when
+      # pdavid --mode up --ollama / --vllm / --gpu is used.
       - OLLAMA_BASE_URL=http://localhost:11434/v1
       - VLLM_BASE_URL=http://localhost:8001
       - SHARED_PATH=/app/shared_data
@@ -147,8 +143,9 @@ services:
       - my_custom_network
 
   sandbox:
-    # Image tag is pinned to the installed package version — see api comment above.
-    image: thanosprime/entities-api-sandbox:${PDAVID_VERSION:-latest}
+    # Pre-built image from Docker Hub.
+    # Always uses :latest — run `pdavid --mode up --pull` to get the newest version.
+    image: thanosprime/entities-api-sandbox:latest
     container_name: sandbox_api
     restart: always
     cap_add:
