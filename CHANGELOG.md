@@ -1,3 +1,10 @@
+# [1.21.0](https://github.com/project-david-ai/platform-docker/compare/v1.20.0...v1.21.0) (2026-03-15)
+
+
+### Features
+
+* add changelog link to upgrade notice and clarify version usage in orchestration ([879ba4f](https://github.com/project-david-ai/platform-docker/commit/879ba4fe7631cd59744f8bc8066af966f8ef8e5f))
+
 # [1.20.0](https://github.com/project-david-ai/platform-docker/compare/v1.19.0...v1.20.0) (2026-03-15)
 
 
