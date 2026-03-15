@@ -337,6 +337,14 @@ class Orchestrator:
         self.log = log
         if getattr(self.args, "verbose", False):
             self.log.setLevel(logging.DEBUG)
+
+        # _ensure_config_files MUST run before _resolve_compose_file and
+        # _load_compose_config. Docker Compose will race to create volume
+        # mount targets as empty directories if the files don't exist yet —
+        # running this first guarantees the actual files are in place before
+        # any Docker operation can win that race.
+        self._ensure_config_files()
+
         self.base_compose = _resolve_compose_file(BASE_COMPOSE_FILE)
         self.gpu_compose = _resolve_compose_file(GPU_COMPOSE_FILE)
         self.compose_config = self._load_compose_config()
@@ -344,7 +352,6 @@ class Orchestrator:
         self._configure_shared_path()
         self._configure_hf_cache_path()
         self._ensure_dockerignore()
-        self._ensure_config_files()
 
     # ------------------------------------------------------------------
     # .env path helpers
@@ -366,27 +373,47 @@ class Orchestrator:
     def _ensure_config_files(self) -> None:
         """
         Copy bundled service config files (nginx, otel, searxng) into the
-        user's CWD the first time pdavid runs.
+        user's CWD before Docker Compose starts.
 
         Rules:
-        - Never overwrites an existing file — local customisations are
+        - Runs first in __init__ to win the race against Docker Compose, which
+          will autocreate volume mount targets as empty directories if the
+          files don't exist at startup time.
+        - If Docker already won a previous race and created a directory where
+          a file should be, the directory is removed and replaced with the
+          correct file. A warning is printed so the user is aware.
+        - Never overwrites an existing *file* — local customisations are
           always respected.
         - Skips silently if the package data cannot be located (e.g. a
           partial or editable install without the data files present).
         - Creates the full directory tree as needed.
-
-        The compose file mounts these paths as read-only volumes:
-          ./docker/nginx/nginx.conf
-          ./docker/otel/otel-config.yaml
-          ./docker/searxng/settings.yml
-        Docker Compose resolves them relative to --project-directory (CWD),
-        so they must be present there before `docker compose up` runs.
         """
         copied = []
         skipped = []
 
         for pkg_rel, cwd_rel in _BUNDLED_CONFIGS:
             dest = Path.cwd() / cwd_rel
+
+            # Docker Compose race condition: if a previous run started before
+            # this file existed, Docker will have created an empty directory
+            # at the mount target path. Detect and replace it with the real file.
+            if dest.exists() and dest.is_dir():
+                self.log.warning(
+                    "Found a directory at '%s' — Docker created it before the config "
+                    "file could be installed. Replacing with the correct bundled file.",
+                    cwd_rel,
+                )
+                try:
+                    shutil.rmtree(dest)
+                except Exception as e:
+                    self.log.warning(
+                        "Could not remove spurious directory '%s': %s. "
+                        "Please delete it manually and re-run pdavid.",
+                        cwd_rel,
+                        e,
+                    )
+                    continue
+
             if dest.exists():
                 skipped.append(cwd_rel)
                 self.log.debug("Config file already present — skipping: %s", cwd_rel)
@@ -394,7 +421,6 @@ class Orchestrator:
 
             try:
                 pkg_files = importlib.resources.files(PACKAGE_NAME)
-                # pkg_rel uses forward slashes; traverse the package tree
                 resource = pkg_files
                 for part in pkg_rel.split("/"):
                     resource = resource / part

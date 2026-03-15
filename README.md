@@ -9,7 +9,6 @@ Deployment orchestrator for the Project David / Entities platform. Provides a si
 
 This package is intended for production use.
 
-
 ---
 
 ## Installation
@@ -19,6 +18,14 @@ pip install projectdavid-platform
 ```
 
 No repository clone required. The compose files and configuration templates are bundled with the package.
+
+> **Windows users:** pip installs the `pdavid` command to a Scripts directory that is not on PATH by default. If `pdavid` is not found after installation, add the following to your PATH:
+>
+> ```
+> C:\Users\<your-username>\AppData\Roaming\Python\Python3XX\Scripts
+> ```
+>
+> Replace `Python3XX` with your Python version (e.g. `Python313`). On Linux and macOS this is handled automatically.
 
 ---
 
@@ -88,19 +95,20 @@ flowchart TD
     VLLM["vllm — GPU inference  ·  --gpu only"]
 
     INSTALL --> CMD
+    CMD --> API
+    API --> SANDBOX
+    SANDBOX --> DB
+    DB --> REDIS
+    REDIS --> QDRANT
+    QDRANT --> SEARXNG
+    SEARXNG --> BROWSER
+    BROWSER --> OTEL
+    OTEL --> JAEGER
+    JAEGER --> SAMBA
+    SAMBA --> OLLAMA
+    OLLAMA --> VLLM
 
-    CMD ~~~ API
-    API ~~~ SANDBOX
-    SANDBOX ~~~ DB
-    DB ~~~ REDIS
-    REDIS ~~~ QDRANT
-    QDRANT ~~~ SEARXNG
-    SEARXNG ~~~ BROWSER
-    BROWSER ~~~ OTEL
-    OTEL ~~~ JAEGER
-    JAEGER ~~~ SAMBA
-    SAMBA ~~~ OLLAMA
-    OLLAMA ~~~ VLLM
+    linkStyle 1,2,3,4,5,6,7,8,9,10,11,12 stroke:none,fill:none
 
     classDef install fill:#ede9fe,stroke:#7c3aed,stroke-width:1.5px,color:#4c1d95
     classDef cmd    fill:#dbeafe,stroke:#3b82f6,stroke-width:1.5px,color:#1e3a5f
@@ -140,8 +148,7 @@ flowchart TD
 
 ---
 
-
-# System requirements — Project David platform
+# System Requirements
 
 ## Services
 
@@ -156,14 +163,14 @@ flowchart TD
 | **Jaeger** — Trace UI | `jaegertracing/all-in-one:latest` | 512MB+ RAM. No persistent volume needed | Internal only |
 | **Ollama** — Local LLM inference | `ollama/ollama:latest` | 4GB+ RAM, 8GB+ for 7B models. Persistent volume (`ollama_data`) | Internal only |
 | **vLLM** — GPU LLM inference *(optional)* | `vllm/vllm-openai:latest` | Nvidia GPU required. `nvidia-container-toolkit` on host. 8GB+ VRAM (16GB+ recommended) | Internal only. `runtime: nvidia` |
-| **FastAPI (api)** — Core orchestration API, Python 3.11 | Custom build — `docker/api/Dockerfile` | 2+ CPU, 2GB+ RAM. Depends on all services. `src/` volume-mounted for dev | Internal only — exposed via Nginx |
-| **Sandbox** — Code execution, Python 3.11 | Custom build — `docker/sandbox/Dockerfile` | 2+ CPU, 1GB+ RAM. Requires `SYS_ADMIN` + `/dev/fuse`. `seccomp:unconfined` | Internal only |
+| **FastAPI (api)** — Core orchestration API | `thanosprime/entities-api-api:latest` | 2+ CPU, 2GB+ RAM. Depends on all services | Internal only — exposed via Nginx |
+| **Sandbox** — Code execution | `thanosprime/entities-api-sandbox:latest` | 2+ CPU, 1GB+ RAM. Requires `SYS_ADMIN` + `/dev/fuse`. `seccomp:unconfined` | Internal only |
 | **Samba** — File share | `dperson/samba` | 256MB+ RAM. Shared path volume mount | Internal only |
 | **Nginx** — Reverse proxy | `nginx:alpine` | 128MB+ RAM. Config at `docker/nginx/nginx.conf` | Port 80 (443 when TLS ready). Single public entry point |
 
 ---
 
-## Minimum host requirements
+## Minimum Host Requirements
 
 | Resource | Minimum | Notes |
 |---|---|---|
@@ -174,7 +181,7 @@ flowchart TD
 
 ---
 
-## Runtime dependencies
+## Runtime Dependencies
 
 - Docker Engine 24+
 - Docker Compose v2+
@@ -185,14 +192,12 @@ flowchart TD
 
 ## Notes
 
-- **vLLM is optional.** Without an Nvidia GPU and `nvidia-container-toolkit`, comment out the `vllm` service block and its `depends_on` entry in the `api` service. The rest of the stack runs without it.
+- **vLLM is optional.** Without an Nvidia GPU and `nvidia-container-toolkit`, exclude it at startup: `pdavid --mode up --exclude vllm --exclude ollama`
 - **Sandbox requires elevated host privileges.** The sandbox container needs `SYS_ADMIN`, `/dev/fuse`, and `seccomp:unconfined`. It will not run on locked-down hosts or most managed container platforms (AWS ECS, Google Cloud Run, etc.) without special configuration.
 - **MySQL port 3307** is exposed on the host for local tooling only (e.g. DBeaver, DataGrip via `SPECIAL_DB_URL`). Remove this binding in production.
 - **All other services are internal only.** No ports are exposed except Nginx (80/443). The API, sandbox, Samba, Redis, Qdrant, Ollama, and vLLM are only reachable within the `my_custom_network` Docker bridge network.
 
-
-
-
+---
 
 ## Prerequisites
 
@@ -308,11 +313,13 @@ Both owned images are published to Docker Hub and updated automatically on each 
 
 ## Related Repositories
 
-| Repository                                                             | Purpose                                                                 |
-|------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| [platform](https://github.com/project-david-ai/platform)                 | The source code of this package                                         |
-| [projectdavid](https://github.com/project-david-ai/projectdavid)             | Python SDK for programatic inteaction with this API, **very important** |
-| 
+| Repository | Purpose |
+|---|---|
+| [platform](https://github.com/project-david-ai/platform) | The source code of this package |
+| [projectdavid](https://github.com/project-david-ai/projectdavid) | Python SDK for programmatic interaction with this API — **start here** |
+| [reference-backend](https://github.com/project-david-ai/reference-backend) | Reference backend application |
+| [reference-frontend](https://github.com/project-david-ai/reference-frontend) | Reference frontend application |
+
 ---
 
 ## Working with the Source Code
@@ -324,62 +331,55 @@ git clone https://github.com/project-david-ai/platform
 pip install -e .
 ```
 
-### Avoid mixing environments.
+Avoid mixing environments.
 
 ---
 
 ## Client Operations
 
-Platform hosts over 80 API endpoints. These manage the lifecycle of
-basic to advanced LLM inference workflows.
+Platform hosts over 80 API endpoints managing the lifecycle of basic to advanced LLM inference workflows.
 
 It is recommended to use the [projectdavid](https://github.com/project-david-ai/projectdavid) Python SDK to interact with the API.
 
 ## Your Architecture
 
-Do not use the API as your backend.
+Do not use the API as your backend directly.
 
-A typical design should follow a three-tier architecture:
+A typical design follows a three-tier architecture:
 
-- projectdavid-platform API is your inference orchestrator, like OpenAI's Assistants API
+- `projectdavid-platform` is your inference orchestrator, equivalent to OpenAI's Assistants API
 - Your backend
 - Your frontend
 
-See [here](https://github.com/project-david-ai/reference-backend) for a [reference](https://github.com/project-david-ai/reference-backend) backend app.
-
-See [here](https://github.com/project-david-ai/reference-frontend) for a [reference](https://github.com/project-david-ai/reference-frontend) frontend app.
+See the [reference backend](https://github.com/project-david-ai/reference-backend) and [reference frontend](https://github.com/project-david-ai/reference-frontend) for starting points.
 
 ## The SDK
 
-
-Install with:  
 ```bash
 pip install projectdavid
 ```
 
-If you want to use the integrated vector store pipeline (RAG):
+With integrated vector store pipeline (RAG):
+
 ```bash
 pip install projectdavid[embeddings]
 ```
-See the quick start guide [here](https://github.com/project-david-ai/projectdavid_docs/blob/master/src/pages/sdk/sdk-quick-start.md).
 
-See the complete SDK documentation [here](https://github.com/project-david-ai/projectdavid_docs/tree/master/src/pages/sdk).
+- [Quick start guide](https://github.com/project-david-ai/projectdavid_docs/blob/master/src/pages/sdk/sdk-quick-start.md)
+- [Complete SDK documentation](https://github.com/project-david-ai/projectdavid_docs/tree/master/src/pages/sdk)
 
-
+---
 
 ## A Quick Note on Privacy
 
-**No data or telemetry leaves the stack but for the following:**
+**No data or telemetry leaves the stack except in the following cases:**
 
 1. You choose to use an external inference endpoint (e.g. `together-ai/Qwen/Qwen2.5-72B-Instruct`)
-
-2. Your AI assistant calls the web search or deep research platform tools at runtime.   
-
-3. One of your own tools calls an external API.
-
+2. Your AI assistant calls the web search or deep research platform tools at runtime
+3. One of your own tools calls an external API
 4. You load an image from an external URL when using a vision model
 
-**Your Instance of this  stack is unique, with unique secrets, we cannot see your conversations, data, or secrets.**
+**Your instance of this stack is unique, with unique secrets. We cannot see your conversations, data, or secrets.**
 
 ---
 
