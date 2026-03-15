@@ -1,3 +1,11 @@
+# [1.18.0](https://github.com/project-david-ai/platform-docker/compare/v1.17.0...v1.18.0) (2026-03-15)
+
+
+### Features
+
+* add version upgrade detection and `--pull` support to orchestration ([527f862](https://github.com/project-david-ai/platform-docker/commit/527f86252ed45298243c3c60ae15c193d429ed58))
+* remove stack diagram from README and fix minor echo formatting ([3d45857](https://github.com/project-david-ai/platform-docker/commit/3d4585730d9ef41115655bc4513882d30b0e29a2))
+
 # [1.17.0](https://github.com/project-david-ai/platform-docker/compare/v1.16.0...v1.17.0) (2026-03-15)
 
 
