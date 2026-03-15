@@ -81,9 +81,13 @@ BASE_COMPOSE_FILE = "docker-compose.yml"
 GPU_COMPOSE_FILE = "docker-compose.gpu.yml"
 PACKAGE_NAME = "projectdavid_platform"
 
-# Bundled config files that must exist in the user's CWD before Docker Compose
-# can start. Each entry is (package-relative path, CWD-relative destination).
+# Bundled config files AND the compose file itself that must exist in the
+# user's CWD before Docker Compose can start.
+# Each entry is (package-relative path, CWD-relative destination).
+# The compose file is included here so it is always copied to CWD on first
+# run, ensuring the local copy is used rather than the package-internal path.
 _BUNDLED_CONFIGS = [
+    ("docker-compose.yml", "docker-compose.yml"),
     ("docker/nginx/nginx.conf", "docker/nginx/nginx.conf"),
     ("docker/otel/otel-config.yaml", "docker/otel/otel-config.yaml"),
     ("docker/searxng/settings.yml", "docker/searxng/settings.yml"),
@@ -236,13 +240,13 @@ class Orchestrator:
     }
 
     _DEFAULT_VALUES = {
-        "ASSISTANTS_BASE_URL": "http://localhost:9000",
+        "ASSISTANTS_BASE_URL": "http://localhost:80",
         "SANDBOX_SERVER_URL": "http://sandbox:8000",
-        "DOWNLOAD_BASE_URL": "http://localhost:9000/v1/files/download",
+        "DOWNLOAD_BASE_URL": "http://localhost:80/v1/files/download",
         "HF_TOKEN": "",
         "HF_CACHE_PATH": "",
         "VLLM_MODEL": "Qwen/Qwen2.5-VL-3B-Instruct",
-        "BASE_URL_HEALTH": "http://localhost:9000/v1/health",
+        "BASE_URL_HEALTH": "http://localhost:80/v1/health",
         "SHELL_SERVER_URL": "ws://sandbox:8000/ws/computer",
         "SHELL_SERVER_EXTERNAL_URL": "ws://localhost:8000/ws/computer",
         "CODE_EXECUTION_URL": "ws://sandbox:8000/ws/execute",
@@ -352,6 +356,12 @@ class Orchestrator:
         if getattr(self.args, "verbose", False):
             self.log.setLevel(logging.DEBUG)
 
+        # _ensure_config_files MUST run before _resolve_compose_file.
+        # It copies the bundled docker-compose.yml (and all service configs)
+        # into CWD so the local copy is always used instead of the package-
+        # internal path. This also wins the Docker Compose race condition where
+        # volume mount targets get created as empty directories before the
+        # config files land.
         self._ensure_config_files()
 
         self.base_compose = _resolve_compose_file(BASE_COMPOSE_FILE)
@@ -375,8 +385,24 @@ class Orchestrator:
     # ------------------------------------------------------------------
 
     def _ensure_config_files(self) -> None:
+        """
+        Copy bundled files (compose file + service configs) into the user's
+        CWD before Docker Compose starts.
+
+        The docker-compose.yml is included in _BUNDLED_CONFIGS so it is
+        always written to CWD on first run. This means the orchestrator
+        always uses the local copy rather than the package-internal path,
+        which prevents the wrong compose file being used after pip install.
+
+        Rules:
+        - Never overwrites an existing file — local customisations are
+          always respected.
+        - If Docker already created an empty directory where a file should
+          live (race condition), it is replaced with the correct file.
+        - Skips silently if the package data cannot be located.
+        - Creates the full directory tree as needed.
+        """
         copied = []
-        skipped = []
 
         for pkg_rel, cwd_rel in _BUNDLED_CONFIGS:
             dest = Path.cwd() / cwd_rel
@@ -399,7 +425,6 @@ class Orchestrator:
                     continue
 
             if dest.exists():
-                skipped.append(cwd_rel)
                 self.log.debug("Config file already present — skipping: %s", cwd_rel)
                 continue
 
@@ -427,7 +452,7 @@ class Orchestrator:
 
         if copied:
             typer.echo(
-                f"\n  Installed {len(copied)} config file(s) to CWD:\n"
+                f"\n  Installed {len(copied)} file(s) to CWD:\n"
                 + "\n".join(f"    {f}" for f in copied)
                 + "\n  Edit them freely — pdavid will never overwrite local copies.\n"
             )
@@ -520,6 +545,9 @@ class Orchestrator:
         ]
         if getattr(self.args, "gpu", False):
             files += ["-f", self.gpu_compose]
+            # Activate the gpu profile so vllm (and any other gpu-profile
+            # services) are included in the compose operation.
+            files += ["--profile", "gpu"]
         return files
 
     def _get_all_services(self) -> List[str]:
@@ -849,7 +877,7 @@ class Orchestrator:
         try:
             pkg_version = importlib.metadata.version("projectdavid-platform")
         except importlib.metadata.PackageNotFoundError:
-            return  # can't determine expected version — skip silently
+            return
 
         try:
             stale = []
@@ -871,7 +899,7 @@ class Orchestrator:
                 )
 
                 if result.returncode != 0:
-                    continue  # container not running — skip quietly
+                    continue
 
                 running_image = result.stdout.strip()
 
@@ -890,7 +918,7 @@ class Orchestrator:
                 )
 
         except Exception:
-            pass  # version check must never crash startup
+            pass
 
     # ------------------------------------------------------------------
     # Container running checks
@@ -1037,7 +1065,6 @@ class Orchestrator:
 
         # DATABASE_URL points to db:3306 (internal) — correct inside the container.
         # SPECIAL_DB_URL points to localhost:3307 (host-side only) — wrong inside container.
-        # Fall back to DATABASE_URL from the loaded .env if no override is provided.
         resolved_db_url = db_url or os.environ.get("DATABASE_URL")
         if not resolved_db_url:
             self.log.error(
@@ -1124,7 +1151,7 @@ def main(
     gpu: bool = typer.Option(
         False,
         "--gpu",
-        help="Include GPU services (vLLM + Ollama) via docker-compose.gpu.yml.",
+        help="Include GPU services (vLLM) via the gpu profile.",
     ),
     services: Optional[List[str]] = typer.Option(
         None,
@@ -1135,7 +1162,7 @@ def main(
         None,
         "--exclude",
         "-x",
-        help="Exclude service(s) from 'up'. Repeat for multiple: --exclude vllm --exclude ollama",
+        help="Exclude service(s) from 'up'. Repeat for multiple: --exclude ollama",
     ),
     down: bool = typer.Option(False, "--down", help="Run 'down' before starting."),
     clear_volumes: bool = typer.Option(
@@ -1169,7 +1196,7 @@ def main(
     Examples:\n
       pdavid --mode up\n
       pdavid --mode up --gpu\n
-      pdavid --mode up --exclude vllm --exclude ollama\n
+      pdavid --mode up --exclude ollama\n
       pdavid --mode up --services api db qdrant\n
       pdavid --mode up --down --clear-volumes\n
       pdavid --mode logs --follow --timestamps\n

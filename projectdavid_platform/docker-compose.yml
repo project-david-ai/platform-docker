@@ -98,11 +98,14 @@ services:
     networks:
       - my_custom_network
 
-  # ── vLLM is optional — requires Nvidia GPU and nvidia-container-toolkit ───
-  # To disable: comment out this entire service and the vllm dependency in api.
+  # ── vLLM is opt-in — only starts when pdavid --mode up --gpu is used ────
+  # Requires an Nvidia GPU and nvidia-container-toolkit on the host.
+  # Never starts by default — the gpu profile must be explicitly activated.
   vllm:
     image: vllm/vllm-openai:latest
     container_name: vllm_server
+    profiles:
+      - gpu
     restart: unless-stopped
     runtime: nvidia
     environment:
@@ -179,8 +182,7 @@ services:
         condition: service_started
       ollama:
         condition: service_started
-      vllm:
-        condition: service_started
+      # vllm is not listed here — it is opt-in via --gpu flag and the gpu profile.
     networks:
       - my_custom_network
 
