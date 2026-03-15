@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/project-david-ai/platform-docker/compare/v1.19.0...v1.20.0) (2026-03-15)
+
+
+### Features
+
+* switch to latest image tags for API and sandbox in Docker Compose configuration ([7c059b3](https://github.com/project-david-ai/platform-docker/commit/7c059b389f84b53fa12b87c5237b63a7cc1f45c3))
+
 # [1.19.0](https://github.com/project-david-ai/platform-docker/compare/v1.18.0...v1.19.0) (2026-03-15)
 
 
