@@ -258,6 +258,10 @@ class Orchestrator:
         "SAMBA_GROUPID": "1000",
         "LOG_LEVEL": "INFO",
         "PYTHONUNBUFFERED": "1",
+        # Inference provider base URLs — required for hosted model routing.
+        # Add your API keys via: pdavid configure --set HYPERBOLIC_API_KEY=...
+        "HYPERBOLIC_BASE_URL": "https://api.hyperbolic.xyz/v1",
+        "TOGETHER_BASE_URL": "https://api.together.xyz/v1",
     }
 
     _ENV_STRUCTURE = {
@@ -270,6 +274,10 @@ class Orchestrator:
             "HF_TOKEN",
             "HF_CACHE_PATH",
             "VLLM_MODEL",
+        ],
+        "Inference Providers": [
+            "HYPERBOLIC_BASE_URL",
+            "TOGETHER_BASE_URL",
         ],
         "Database Configuration": [
             "DATABASE_URL",
