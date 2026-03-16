@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.21.0...v1.22.0) (2026-03-16)
+
+
+### Features
+
+* add inference provider base URLs for hosted model routing ([00b58af](https://github.com/project-david-ai/projectdavid-platform/commit/00b58afe63720262c3da432ccab88bb45c245170))
+
 # [1.21.0](https://github.com/project-david-ai/platform-docker/compare/v1.20.0...v1.21.0) (2026-03-15)
 
 
