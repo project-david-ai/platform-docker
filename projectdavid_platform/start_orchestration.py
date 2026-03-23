@@ -583,7 +583,7 @@ class Orchestrator:
         )
         return False
 
-    def _preflight(self) -> bool:
+    def _preflight_updated(self) -> bool:
         self.log.debug("Running preflight dependency checks...")
         if not self._has_docker():
             return False
@@ -592,6 +592,21 @@ class Orchestrator:
 
         training = getattr(self.args, "training", False)
         if training and not self._validate_gpu_prereqs("--training"):
+            return False
+        # -------------------------------------------------------------------
+        # Port conflict check for --training overlay
+        # Format: {port: (description, "error"|"warn")}
+        # "error" = hard stop, "warn" = logged but not blocking
+        # (worker handles vLLM port eviction itself so 8001 is warn-only)
+        # ---------------------------------------------------------------------
+        if training and not self._check_port_conflicts(
+            {
+                9001: ("training-api", "error"),
+                8265: ("Ray dashboard", "error"),
+                10001: ("Ray client", "error"),
+                8001: ("vLLM spawn port", "warn"),
+            }
+        ):
             return False
 
         gpu = getattr(self.args, "gpu", False)
@@ -998,6 +1013,73 @@ class Orchestrator:
                 "_merge_env_for_overlay: all required vars for '%s' already present.", overlay
             )
 
+    def _check_port_conflicts(self, ports: dict) -> bool:
+        """
+        Checks whether required host ports are already bound before starting
+        an overlay. Gives the user a clear actionable error instead of a
+        cryptic Docker compose failure.
+
+        Args:
+            ports: dict of {port_number: service_description}
+                    e.g. {9001: "training-api", 8265: "Ray dashboard"}
+
+        Returns:
+            True  — all ports are free, safe to proceed
+            False — one or more ports are already in use, startup blocked
+        """
+        import socket as _socket
+
+        blocked = []
+        warned = []
+
+        for port, description in ports.items():
+            severity = ports[port] if isinstance(ports[port], tuple) else (ports[port], "error")
+            if isinstance(severity, tuple):
+                label, level = severity
+            else:
+                label, level = severity, "error"
+
+            try:
+                with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as sock:
+                    sock.settimeout(1)
+                    result = sock.connect_ex(("127.0.0.1", port))
+                    in_use = result == 0
+            except Exception:
+                in_use = False
+
+            if in_use:
+                if level == "warn":
+                    warned.append((port, label))
+                else:
+                    blocked.append((port, label))
+
+        if warned:
+            for port, label in warned:
+                self.log.warning(
+                    "Port %s (%s) appears to be in use. "
+                    "The worker will attempt to evict the existing container automatically.",
+                    port,
+                    label,
+                )
+
+        if blocked:
+            typer.echo("\n" + "=" * 60, err=True)
+            typer.echo("  Port conflict — startup blocked", err=True)
+            typer.echo("=" * 60, err=True)
+            for port, label in blocked:
+                typer.echo(f"  ✗  Port {port} ({label}) is already in use.", err=True)
+            typer.echo(
+                "\n  Free the ports above and re-run, or stop the conflicting service:\n"
+                "    pdavid --mode down\n"
+                "  Then:\n"
+                "    pdavid --mode up --training\n",
+                err=True,
+            )
+            typer.echo("=" * 60 + "\n", err=True)
+            return False
+
+        return True
+
     # ------------------------------------------------------------------
     # Secret validation
     # ------------------------------------------------------------------
@@ -1252,8 +1334,6 @@ class Orchestrator:
 # ---------------------------------------------------------------------------
 # CLI entry-points
 # ---------------------------------------------------------------------------
-
-
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
