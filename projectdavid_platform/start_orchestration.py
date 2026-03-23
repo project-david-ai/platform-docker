@@ -4,17 +4,38 @@
 # Distributed as part of the `projectdavid-platform` pip package.
 #
 # After `pip install projectdavid-platform`:
-#   pdavid --mode up
-#   pdavid --mode up --ollama          # Ollama only
-#   pdavid --mode up --vllm            # vLLM only
-#   pdavid --mode up --gpu             # Both Ollama + vLLM
-#   pdavid --mode up --pull
-#   pdavid --mode up --exclude samba
-#   pdavid --mode up --services api db qdrant
-#   pdavid --mode logs --follow
+#
+#   BASE STACK
+#   pdavid --mode up                        # Core platform only
+#   pdavid --mode up --pull                 # Pull latest images before starting
+#   pdavid --mode up --exclude samba        # Start without a specific service
+#   pdavid --mode up --services api db      # Start specific services only
+#   pdavid --mode logs --follow             # Tail logs
+#   pdavid --mode down_only                 # Stop the stack
+#
+#   GPU INFERENCE (opt-in, requires NVIDIA GPU + nvidia-container-toolkit)
+#   pdavid --mode up --ollama               # Ollama only
+#   pdavid --mode up --vllm                 # vLLM only (static server)
+#   pdavid --mode up --gpu                  # Both Ollama + vLLM
+#
+#   SOVEREIGN FORGE — Training + Inference Mesh (opt-in, requires NVIDIA GPU)
+#   pdavid --mode up --training             # Training pipeline + Ray cluster
+#   pdavid --mode up --training --vllm      # + static vLLM inference server
+#   pdavid --mode up --gpu --training       # Full sovereign stack
+#
+#   CONFIGURATION
 #   pdavid configure --set HF_TOKEN=hf_abc123
+#   pdavid configure --set TRAINING_PROFILE=standard
+#   pdavid configure --set RAY_ADDRESS=ray://192.168.1.10:10001
+#   pdavid configure --interactive
 #   pdavid bootstrap-admin
 #
+# SCALE-OUT (adding a second GPU node to the Ray cluster):
+#   On the remote machine, set RAY_ADDRESS=ray://<head_ip>:10001 in .env
+#   then: docker compose -f docker-compose.yml -f docker-compose.training.yml up -d training-worker
+#   Ray discovers the node automatically — no code changes required.
+
+
 from __future__ import annotations
 
 import importlib.metadata
@@ -147,18 +168,25 @@ def _resolve_compose_file(filename: str) -> str:
 # ---------------------------------------------------------------------------
 # Typer app
 # ---------------------------------------------------------------------------
+_TYPER_HELP = (
+    "Deployment orchestrator for the Project David / Entities platform.\n\n"
+    "Install:    pip install projectdavid-platform\n\n"
+    "Base stack: pdavid --mode up\n"
+    "Update:     pdavid --mode up --pull\n\n"
+    "GPU inference (opt-in):\n"
+    "  Ollama:   pdavid --mode up --ollama\n"
+    "  vLLM:     pdavid --mode up --vllm\n"
+    "  Both:     pdavid --mode up --gpu\n\n"
+    "Sovereign Forge — training + inference mesh (opt-in):\n"
+    "  Training: pdavid --mode up --training\n"
+    "  Full:     pdavid --mode up --gpu --training\n\n"
+    "Config:     pdavid configure --set HF_TOKEN=hf_abc123\n"
+    "Admin:      pdavid bootstrap-admin"
+)
+
 app = typer.Typer(
     name="pdavid",
-    help=(
-        "Deployment orchestrator for the Project David / Entities platform.\n\n"
-        "Install:   pip install projectdavid-platform\n"
-        "Start:     pdavid --mode up\n"
-        "Update:    pdavid --mode up --pull\n"
-        "Ollama:    pdavid --mode up --ollama\n"
-        "vLLM:      pdavid --mode up --vllm\n"
-        "Both GPU:  pdavid --mode up --gpu\n"
-        "Config:    pdavid configure --set HF_TOKEN=hf_abc123"
-    ),
+    help=_TYPER_HELP,
     add_completion=False,
 )
 
@@ -583,7 +611,7 @@ class Orchestrator:
         )
         return False
 
-    def _preflight_updated(self) -> bool:
+    def _preflight(self) -> bool:
         self.log.debug("Running preflight dependency checks...")
         if not self._has_docker():
             return False
@@ -1334,6 +1362,8 @@ class Orchestrator:
 # ---------------------------------------------------------------------------
 # CLI entry-points
 # ---------------------------------------------------------------------------
+
+
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
@@ -1414,20 +1444,33 @@ def main(
     """
     Manage the Project David / Entities platform stack.
 
-    Examples:\n
+    BASE STACK:\n
       pdavid --mode up\n
       pdavid --mode up --pull\n
-      pdavid --mode up --ollama\n
-      pdavid --mode up --vllm\n
-      pdavid --mode up --gpu\n
       pdavid --mode up --exclude samba\n
       pdavid --mode up --services api db qdrant\n
       pdavid --mode up --down --clear-volumes\n
       pdavid --mode logs --follow --timestamps\n
       pdavid --mode logs --services api --tail 100\n
+
+    GPU INFERENCE (opt-in):\n
+      pdavid --mode up --ollama\n
+      pdavid --mode up --vllm\n
+      pdavid --mode up --gpu\n
+
+    SOVEREIGN FORGE — training + inference mesh (opt-in):\n
+      pdavid --mode up --training\n
+      pdavid --mode up --training --vllm\n
+      pdavid --mode up --gpu --training\n
+
+    CONFIGURATION:\n
       pdavid configure --set HF_TOKEN=hf_abc123\n
+      pdavid configure --set TRAINING_PROFILE=standard\n
+      pdavid configure --set RAY_ADDRESS=ray://192.168.1.10:10001\n
+      pdavid configure --interactive\n
       pdavid bootstrap-admin\n
     """
+
     if ctx.invoked_subcommand is not None:
         return
 
