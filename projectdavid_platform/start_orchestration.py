@@ -118,6 +118,8 @@ class Orchestrator:
 
     _ENV_FILE = ".env"
 
+    # ADMIN_API_KEY is intentionally excluded here.
+    # It is generated and written only when `bootstrap-admin` is explicitly called.
     _GENERATED_SECRETS = [
         "SIGNED_URL_SECRET",
         "API_KEY",
@@ -128,7 +130,6 @@ class Orchestrator:
         "SANDBOX_AUTH_SECRET",
         "SMBCLIENT_PASSWORD",
         "SEARXNG_SECRET_KEY",
-        "ADMIN_API_KEY",
     ]
 
     _USER_REQUIRED = {
@@ -323,6 +324,45 @@ class Orchestrator:
         except Exception:
             return None
 
+    # ------------------------------------------------------------------
+    # Admin key management — called only from bootstrap_admin()
+    # ------------------------------------------------------------------
+
+    def _provision_admin_api_key(self) -> str:
+        """
+        Generate a fresh ADMIN_API_KEY, persist it to .env, reload the
+        environment, and return the plaintext key so the caller can
+        display it once to the operator.
+
+        If ADMIN_API_KEY is already present and non-empty in .env the
+        existing value is returned unchanged (idempotent re-runs).
+        """
+        env_path = Path(self._ENV_FILE)
+        content = env_path.read_text(encoding="utf-8")
+
+        existing = os.environ.get("ADMIN_API_KEY", "").strip()
+        if existing and existing not in self._INSECURE_VALUES:
+            self.log.info("ADMIN_API_KEY already present in .env — reusing.")
+            return existing
+
+        new_key = f"ad_{secrets.token_urlsafe(32)}"
+
+        # Replace in-place if the placeholder line exists, otherwise append.
+        if re.search(r"^ADMIN_API_KEY=", content, re.MULTILINE):
+            content = re.sub(
+                r"^ADMIN_API_KEY=.*",
+                f"ADMIN_API_KEY={new_key}",
+                content,
+                flags=re.MULTILINE,
+            )
+        else:
+            content += f"\nADMIN_API_KEY={new_key}\n"
+
+        env_path.write_text(content, encoding="utf-8")
+        os.environ["ADMIN_API_KEY"] = new_key
+        self.log.info("ADMIN_API_KEY written to .env.")
+        return new_key
+
 
 # ---------------------------------------------------------------------------
 # Typer App Initialization
@@ -362,6 +402,10 @@ def main(
 def bootstrap_admin(db_url: Optional[str] = None):
     args = SimpleNamespace(training=False)
     o = Orchestrator(args)
+
+    # Generate (or retrieve) the admin key — only happens here, never at init.
+    admin_key = o._provision_admin_api_key()
+
     resolved_db_url = db_url or os.environ.get("DATABASE_URL")
     cmd = (
         ["docker", "compose"]
@@ -376,6 +420,13 @@ def bootstrap_admin(db_url: Optional[str] = None):
         ]
     )
     o._run_command(cmd)
+
+    # Print admin credentials once, clearly, after the bootstrap completes.
+    typer.echo("\n" + "=" * 60)
+    typer.echo("  Bootstrap complete.")
+    typer.echo(f"  ADMIN_API_KEY : {admin_key}")
+    typer.echo("  Store this key securely — it will not be shown again.")
+    typer.echo("=" * 60 + "\n")
 
 
 @app.command()
