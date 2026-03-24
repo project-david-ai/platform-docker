@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.24.5...v1.25.0) (2026-03-24)
+
+
+### Features
+
+* defer ADMIN_API_KEY generation to bootstrap-admin command ([14717ea](https://github.com/project-david-ai/projectdavid-platform/commit/14717ea393107299c26f2948f8937d6325b2f5c7))
+
 ## [1.24.5](https://github.com/project-david-ai/projectdavid-platform/compare/v1.24.4...v1.24.5) (2026-03-24)
 
 
