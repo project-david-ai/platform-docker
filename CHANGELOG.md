@@ -1,3 +1,10 @@
+## [1.23.1](https://github.com/project-david-ai/projectdavid-platform/compare/v1.23.0...v1.23.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* remove AUTO_MIGRATE flag from distribution compose ([a6dc3f9](https://github.com/project-david-ai/projectdavid-platform/commit/a6dc3f94043a3bde94fc966b131191db55f4c240))
+
 # [1.23.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.22.0...v1.23.0) (2026-03-24)
 
 
