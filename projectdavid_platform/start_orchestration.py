@@ -2,7 +2,7 @@
 #
 # Deployment orchestrator for the Project David / Entities platform.
 #
-# VERSION: 1.23.4-Full-Fix (Restores 'app', Fixes Tests, Auto-Gen & Manifest)
+# VERSION: 1.23.4-Full-Fix-with-Entrypoint
 #
 from __future__ import annotations
 
@@ -325,7 +325,7 @@ class Orchestrator:
 
 
 # ---------------------------------------------------------------------------
-# Typer App Initialization (THE MISSING BLOCK)
+# Typer App Initialization
 # ---------------------------------------------------------------------------
 _TYPER_HELP = (
     "Deployment orchestrator for the Project David / Entities platform.\n\n"
@@ -388,5 +388,10 @@ def configure(set_var: List[str] = typer.Option(None, "--set")):
     env_path.write_text(content)
 
 
-if __name__ == "__main__":
+def entry_point():
+    """This function is called by the pip installed entrypoint script."""
     app()
+
+
+if __name__ == "__main__":
+    entry_point()
