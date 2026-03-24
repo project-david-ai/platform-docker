@@ -1,3 +1,10 @@
+## [1.25.1](https://github.com/project-david-ai/projectdavid-platform/compare/v1.25.0...v1.25.1) (2026-03-24)
+
+
+### Bug Fixes
+
+* correct training-worker entrypoint and profile default ([e8cba62](https://github.com/project-david-ai/projectdavid-platform/commit/e8cba62eb28f079420a7b76a011dd3434136be91))
+
 # [1.25.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.24.5...v1.25.0) (2026-03-24)
 
 
