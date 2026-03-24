@@ -414,5 +414,5 @@ def configure(set_var: List[str] = typer.Option(None, "--set")):
     typer.echo("Config updated.")
 
 
-if __name__ == "__main__":
+def entry_point():
     app()
