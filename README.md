@@ -288,6 +288,9 @@ rack — and it handles training job scheduling, model deployment, and inference
 routing across all of them simultaneously. Add a new node with one environment
 variable. Your data and models never leave your machines.
 
+
+![Project David Cluster](https://raw.githubusercontent.com/project-david-ai/projectdavid-core/master/assets/svg/pd_cluster.svg)
+
 ```bash
 pdavid --mode up --training        # training pipeline + Ray cluster
 pdavid --mode up --gpu --training  # full sovereign stack
