@@ -416,3 +416,7 @@ def configure(set_var: List[str] = typer.Option(None, "--set")):
 
 def entry_point():
     app()
+
+
+if __name__ == "__main__":
+    entry_point()
