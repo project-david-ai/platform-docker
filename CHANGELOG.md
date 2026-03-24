@@ -1,3 +1,11 @@
+## [1.24.3](https://github.com/project-david-ai/projectdavid-platform/compare/v1.24.2...v1.24.3) (2026-03-24)
+
+
+### Bug Fixes
+
+* prevent automatic generation of admin credentials during initial setup ([86876c6](https://github.com/project-david-ai/projectdavid-platform/commit/86876c654998e87b03517d95ff2b78cdc6e193aa))
+* prevent automatic generation of admin credentials during initial setup ([77bacf8](https://github.com/project-david-ai/projectdavid-platform/commit/77bacf8b3e1a6fa8e39333d529213d6efb71e87a))
+
 ## [1.24.2](https://github.com/project-david-ai/projectdavid-platform/compare/v1.24.1...v1.24.2) (2026-03-24)
 
 
