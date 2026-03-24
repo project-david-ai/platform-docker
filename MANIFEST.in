@@ -1,0 +1,4 @@
+include projectdavid_platform/*.yml
+recursive-include projectdavid_platform/docker *.conf
+recursive-include projectdavid_platform/docker *.yaml
+recursive-include projectdavid_platform/docker *.yml
