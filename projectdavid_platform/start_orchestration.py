@@ -14,7 +14,7 @@ import platform as _platform
 import re
 import secrets
 import shutil
-import subprocess  # nosec B404 — required for docker compose orchestration; input is never user-supplied
+import subprocess  # nosec B404
 import sys
 import time
 from pathlib import Path
@@ -276,6 +276,7 @@ class Orchestrator:
         "SANDBOX_SERVER_URL": "http://sandbox:8000",
         "DOWNLOAD_BASE_URL": "http://localhost:80/v1/files/download",
         "HF_TOKEN": "",
+        # nosec B105 — empty string is intentional default; token is user-supplied via pdavid configure
         "HF_CACHE_PATH": "",
         "VLLM_MODEL": "Qwen/Qwen2.5-VL-3B-Instruct",
         "BASE_URL_HEALTH": "http://localhost:80/v1/health",
@@ -727,7 +728,7 @@ class Orchestrator:
                 check=check,
                 capture_output=capture_output,
                 text=text,
-                shell=self.is_windows,  # nosec B602 — shell=True only on Windows for PATH resolution; cmd_list is always internally constructed
+                shell=self.is_windows,  # nosec B602
                 **kwargs,
             )
             return result
