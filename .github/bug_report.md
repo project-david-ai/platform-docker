@@ -10,9 +10,9 @@ assignees: ''
 Describe clearly the bug encountered.
 
 ## 🔢 Steps to Reproduce
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## 🎯 Expected Behavior
 Explain clearly what you expected to happen.
