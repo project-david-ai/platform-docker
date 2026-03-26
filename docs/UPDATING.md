@@ -7,8 +7,8 @@ Understanding which has changed determines what action is required.
 
 ## Component 1 — Docker Images
 
-**Owned by:** `entities_api` repository  
-**Published to:** Docker Hub (`thanosprime/entities-api-api`, `thanosprime/entities-api-sandbox`)  
+**Owned by:** `entities_api` repository
+**Published to:** Docker Hub (`thanosprime/entities-api-api`, `thanosprime/entities-api-sandbox`)
 **Updated when:** Bug fixes, new features, or model changes are shipped in the API source code.
 
 **Action required from architect:**
@@ -24,8 +24,8 @@ affected containers. Volumes and data are untouched.
 
 ## Component 2 — Platform Orchestrator
 
-**Owned by:** `platform-docker` repository  
-**Published to:** PyPI (`projectdavid-platform`)  
+**Owned by:** `platform-docker` repository
+**Published to:** PyPI (`projectdavid-platform`)
 **Updated when:** The compose configuration changes — new services, new environment
 variables, port mapping changes, CLI improvements, or security fixes in secret generation.
 

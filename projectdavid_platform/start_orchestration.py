@@ -14,7 +14,7 @@ import platform as _platform
 import re
 import secrets
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 import time
 from pathlib import Path
@@ -97,7 +97,9 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -132,9 +134,7 @@ _DOCKER_INSTALL_URLS = {
     "linux": "https://docs.docker.com/engine/install/",
 }
 _DOCKER_COMPOSE_INSTALL_URL = "https://docs.docker.com/compose/install/"
-_NVIDIA_TOOLKIT_INSTALL_URL = (
-    "https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html"
-)
+_NVIDIA_TOOLKIT_INSTALL_URL = "https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html"
 
 _OWNED_SERVICES = {
     "api": API_CONTAINER_NAME,
@@ -276,6 +276,7 @@ class Orchestrator:
         "SANDBOX_SERVER_URL": "http://sandbox:8000",
         "DOWNLOAD_BASE_URL": "http://localhost:80/v1/files/download",
         "HF_TOKEN": "",
+        # nosec B105 — empty string is intentional default; token is user-supplied via pdavid configure
         "HF_CACHE_PATH": "",
         "VLLM_MODEL": "Qwen/Qwen2.5-VL-3B-Instruct",
         "BASE_URL_HEALTH": "http://localhost:80/v1/health",
@@ -566,7 +567,9 @@ class Orchestrator:
         if shutil.which("docker"):
             return True
         system = _platform.system().lower()
-        install_url = _DOCKER_INSTALL_URLS.get(system, "https://docs.docker.com/get-docker/")
+        install_url = _DOCKER_INSTALL_URLS.get(
+            system, "https://docs.docker.com/get-docker/"
+        )
         typer.echo(
             "\nDocker is not installed or not found in PATH.\n"
             f"Install Docker for your platform: {install_url}\n"
@@ -598,7 +601,9 @@ class Orchestrator:
         if not cmd:
             return False
         try:
-            self._run_command([cmd], check=True, capture_output=True, suppress_logs=True)
+            self._run_command(
+                [cmd], check=True, capture_output=True, suppress_logs=True
+            )
             return True
         except (subprocess.CalledProcessError, FileNotFoundError):
             return False
@@ -707,7 +712,13 @@ class Orchestrator:
         return list(self.compose_config.get("services", {}).keys())
 
     def _run_command(
-        self, cmd_list, check=True, capture_output=False, text=True, suppress_logs=False, **kwargs
+        self,
+        cmd_list,
+        check=True,
+        capture_output=False,
+        text=True,
+        suppress_logs=False,
+        **kwargs,
     ):
         if not suppress_logs:
             self.log.info("Running: %s", " ".join(cmd_list))
@@ -717,12 +728,14 @@ class Orchestrator:
                 check=check,
                 capture_output=capture_output,
                 text=text,
-                shell=self.is_windows,
+                shell=self.is_windows,  # nosec B602
                 **kwargs,
             )
             return result
         except subprocess.CalledProcessError as e:
-            self.log.error("Command failed (code %s): %s", e.returncode, " ".join(cmd_list))
+            self.log.error(
+                "Command failed (code %s): %s", e.returncode, " ".join(cmd_list)
+            )
             if e.stdout:
                 self.log.error("STDOUT:\n%s", e.stdout.strip())
             if e.stderr:
@@ -756,7 +769,11 @@ class Orchestrator:
         if not self.compose_config:
             return None
         try:
-            ports = self.compose_config.get("services", {}).get(service_name, {}).get("ports", [])
+            ports = (
+                self.compose_config.get("services", {})
+                .get(service_name, {})
+                .get("ports", [])
+            )
             container_port_base = str(container_port).split("/")[0]
             for mapping in ports:
                 parts = str(mapping).split(":")
@@ -828,7 +845,9 @@ class Orchestrator:
                 generation_log[key] = "Provided interactively by user"
                 typer.echo(f"  {key} saved.\n")
             else:
-                self.log.warning("'%s' skipped. Run: pdavid configure --set %s=<value>", key, key)
+                self.log.warning(
+                    "'%s' skipped. Run: pdavid configure --set %s=<value>", key, key
+                )
         typer.echo("=" * 60 + "\n")
 
     def _generate_dot_env_file(self):
@@ -865,7 +884,9 @@ class Orchestrator:
                 env_values["SPECIAL_DB_URL"] = (
                     f"mysql+pymysql://{db_user}:{escaped}@localhost:{host_port}/{db_name}"
                 )
-                generation_log["SPECIAL_DB_URL"] = f"Constructed using host port ({host_port})"
+                generation_log["SPECIAL_DB_URL"] = (
+                    f"Constructed using host port ({host_port})"
+                )
 
         if not env_values.get("HF_CACHE_PATH"):
             env_values["HF_CACHE_PATH"] = os.path.join(
@@ -876,11 +897,15 @@ class Orchestrator:
         # PDAVID_VERSION is stored in .env solely to power the upgrade notice.
         # It is NOT used to pin image tags — the compose file always uses :latest.
         try:
-            env_values["PDAVID_VERSION"] = importlib.metadata.version("projectdavid-platform")
+            env_values["PDAVID_VERSION"] = importlib.metadata.version(
+                "projectdavid-platform"
+            )
             generation_log["PDAVID_VERSION"] = "Auto-resolved from installed package"
         except importlib.metadata.PackageNotFoundError:
             env_values["PDAVID_VERSION"] = "latest"
-            generation_log["PDAVID_VERSION"] = "Package not found — defaulting to latest"
+            generation_log["PDAVID_VERSION"] = (
+                "Package not found — defaulting to latest"
+            )
 
         self._prompt_user_required(env_values, generation_log)
 
@@ -943,7 +968,8 @@ class Orchestrator:
             typer.echo(f"  {key:<24}: {value}")
         typer.echo("=" * 60)
         typer.echo(
-            "\n  Use ADMIN_API_KEY to bootstrap the admin user:\n" "    pdavid bootstrap-admin\n"
+            "\n  Use ADMIN_API_KEY to bootstrap the admin user:\n"
+            "    pdavid bootstrap-admin\n"
         )
 
     def _check_for_required_env_file(self):
@@ -962,7 +988,9 @@ class Orchestrator:
             shared_path = {
                 "windows": os.path.join(base, "entities_share"),
                 "linux": os.path.join(base, ".local", "share", "entities_share"),
-                "darwin": os.path.join(base, "Library", "Application Support", "entities_share"),
+                "darwin": os.path.join(
+                    base, "Library", "Application Support", "entities_share"
+                ),
             }.get(system, os.path.abspath("./entities_share"))
             os.environ["SHARED_PATH"] = shared_path
             self.log.info("Defaulting SHARED_PATH to: %s", shared_path)
@@ -1009,21 +1037,25 @@ class Orchestrator:
         env_path = Path(self._ENV_FILE)
         if not env_path.exists():
             self.log.debug(
-                "_merge_env_for_overlay: .env not found — skipping merge for '%s'", overlay
+                "_merge_env_for_overlay: .env not found — skipping merge for '%s'",
+                overlay,
             )
             return
 
         content = env_path.read_text(encoding="utf-8")
-        injected = []
+        injected: list[str] = []
 
         for key, default in required.items():
             # Check both the file content and the live environment
             if re.search(rf"^{re.escape(key)}=", content, re.MULTILINE):
-                self.log.debug("_merge_env_for_overlay: '%s' already in .env — skipping.", key)
+                self.log.debug(
+                    "_merge_env_for_overlay: '%s' already in .env — skipping.", key
+                )
                 continue
             if os.environ.get(key, "").strip():
                 self.log.debug(
-                    "_merge_env_for_overlay: '%s' already in environment — skipping.", key
+                    "_merge_env_for_overlay: '%s' already in environment — skipping.",
+                    key,
                 )
                 continue
 
@@ -1033,7 +1065,9 @@ class Orchestrator:
             content += f"{key}={default}\n"
             os.environ[key] = default
             injected.append(key)
-            self.log.info("_merge_env_for_overlay: injected '%s=%s' into .env", key, default)
+            self.log.info(
+                "_merge_env_for_overlay: injected '%s=%s' into .env", key, default
+            )
 
         if injected:
             env_path.write_text(content, encoding="utf-8")
@@ -1044,7 +1078,8 @@ class Orchestrator:
             )
         else:
             self.log.debug(
-                "_merge_env_for_overlay: all required vars for '%s' already present.", overlay
+                "_merge_env_for_overlay: all required vars for '%s' already present.",
+                overlay,
             )
 
     def _check_port_conflicts(self, ports: dict) -> bool:
@@ -1067,7 +1102,11 @@ class Orchestrator:
         warned = []
 
         for port, description in ports.items():
-            severity = ports[port] if isinstance(ports[port], tuple) else (ports[port], "error")
+            severity = (
+                ports[port]
+                if isinstance(ports[port], tuple)
+                else (ports[port], "error")
+            )
             if isinstance(severity, tuple):
                 label, level = severity
             else:
@@ -1123,7 +1162,8 @@ class Orchestrator:
         for key in self._GENERATED_SECRETS:
             if os.environ.get(key, "") in self._INSECURE_VALUES:
                 self.log.error(
-                    "Insecure value for '%s'. Delete .env and re-run to regenerate.", key
+                    "Insecure value for '%s'. Delete .env and re-run to regenerate.",
+                    key,
                 )
                 failed = True
         if failed:
@@ -1144,7 +1184,14 @@ class Orchestrator:
     def _is_container_running(self, container_name: str) -> bool:
         try:
             result = self._run_command(
-                ["docker", "ps", "--filter", f"name=^{container_name}$", "--format", "{{.Names}}"],
+                [
+                    "docker",
+                    "ps",
+                    "--filter",
+                    f"name=^{container_name}$",
+                    "--format",
+                    "{{.Names}}",
+                ],
                 capture_output=True,
                 check=False,
                 suppress_logs=True,
@@ -1240,7 +1287,9 @@ class Orchestrator:
             self.log.info("Stack started successfully.")
             if not getattr(self.args, "attached", False):
                 logs_hint = (
-                    ["docker", "compose"] + self._compose_files() + ["logs", "-f", "--tail=50"]
+                    ["docker", "compose"]
+                    + self._compose_files()
+                    + ["logs", "-f", "--tail=50"]
                 )
                 if target:
                     logs_hint.extend(target)
@@ -1250,7 +1299,9 @@ class Orchestrator:
 
     def _handle_down(self):
         target_services = getattr(self.args, "services", None) or []
-        down_cmd = ["docker", "compose"] + self._compose_files() + ["down", "--remove-orphans"]
+        down_cmd = (
+            ["docker", "compose"] + self._compose_files() + ["down", "--remove-orphans"]
+        )
         if getattr(self.args, "clear_volumes", False):
             down_cmd.append("--volumes")
         if target_services:
@@ -1303,7 +1354,9 @@ class Orchestrator:
             + ["down", "--volumes", "--remove-orphans"],
             check=False,
         )
-        self._run_command(["docker", "system", "prune", "-a", "--volumes", "--force"], check=True)
+        self._run_command(
+            ["docker", "system", "prune", "-a", "--volumes", "--force"], check=True
+        )
         self.log.info("Nuke complete.")
 
     # ------------------------------------------------------------------
@@ -1464,11 +1517,17 @@ def main(
         "--pull",
         help="Pull the latest container images before starting. Use after upgrading the package.",
     ),
-    attached: bool = typer.Option(False, "--attached", "-a", help="Run up in foreground."),
-    build_before_up: bool = typer.Option(False, "--build-before-up", help="Build before up."),
+    attached: bool = typer.Option(
+        False, "--attached", "-a", help="Run up in foreground."
+    ),
+    build_before_up: bool = typer.Option(
+        False, "--build-before-up", help="Build before up."
+    ),
     # --- Build ---
     no_cache: bool = typer.Option(False, "--no-cache", help="Build without cache."),
-    parallel: bool = typer.Option(False, "--parallel", help="Build images in parallel."),
+    parallel: bool = typer.Option(
+        False, "--parallel", help="Build images in parallel."
+    ),
     # --- Nuke ---
     nuke: bool = typer.Option(
         False,
@@ -1477,7 +1536,9 @@ def main(
     ),
     # --- Logs ---
     follow: bool = typer.Option(False, "--follow", "-f", help="Follow log output."),
-    tail: Optional[int] = typer.Option(None, "--tail", help="Number of log lines to show."),
+    tail: Optional[int] = typer.Option(
+        None, "--tail", help="Number of log lines to show."
+    ),
     timestamps: bool = typer.Option(
         False, "--timestamps", "-t", help="Show timestamps in log output."
     ),
@@ -1522,7 +1583,8 @@ def main(
     valid_modes = {"up", "build", "both", "down_only", "logs"}
     if mode not in valid_modes:
         typer.echo(
-            f"[error] Invalid --mode '{mode}'. " f"Choose from: {', '.join(sorted(valid_modes))}",
+            f"[error] Invalid --mode '{mode}'. "
+            f"Choose from: {', '.join(sorted(valid_modes))}",
             err=True,
         )
         raise SystemExit(1)
@@ -1587,7 +1649,10 @@ def configure(
         None, "--set", "-s", help="Set KEY=VALUE in .env.", metavar="KEY=VALUE"
     ),
     interactive: bool = typer.Option(
-        False, "--interactive", "-i", help="Interactively prompt for user-required variables."
+        False,
+        "--interactive",
+        "-i",
+        help="Interactively prompt for user-required variables.",
     ),
 ) -> None:
     """
@@ -1601,7 +1666,8 @@ def configure(
     env_path = Path(Orchestrator._ENV_FILE)
     if not env_path.exists():
         typer.echo(
-            f"[error] '{Orchestrator._ENV_FILE}' not found. " "Run 'pdavid --mode up' first.",
+            f"[error] '{Orchestrator._ENV_FILE}' not found. "
+            "Run 'pdavid --mode up' first.",
             err=True,
         )
         raise SystemExit(1)
@@ -1624,7 +1690,11 @@ def configure(
         typer.echo("  Press Enter to skip and leave current value unchanged.\n")
         for key, (label, help_text, hide) in Orchestrator._USER_REQUIRED.items():
             current = os.environ.get(key, "")
-            status = "(currently set)" if current else "(currently blank — press Enter to skip)"
+            status = (
+                "(currently set)"
+                if current
+                else "(currently blank — press Enter to skip)"
+            )
             typer.echo(f"  {help_text}\n")
             value = typer.prompt(
                 f"  {label} {status}", default="", show_default=False, hide_input=hide
@@ -1696,7 +1766,9 @@ def bootstrap_admin(
 
     Safe to re-run: existing users and keys are detected and left untouched.
     """
-    args = SimpleNamespace(verbose=verbose, gpu=False, ollama=False, vllm=False, training=False)
+    args = SimpleNamespace(
+        verbose=verbose, gpu=False, ollama=False, vllm=False, training=False
+    )
     o = Orchestrator(args)
 
     # Generate (or retrieve) the admin key — only happens here, never at init.
