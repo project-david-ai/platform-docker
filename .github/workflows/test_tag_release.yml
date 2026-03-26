@@ -35,7 +35,7 @@ jobs:
           python -m pip install --upgrade pip
           # Match SDK Gold Standard versions for environment parity
           pip install black==24.1.1 isort==5.13.2 ruff==0.4.0 mypy bandit safety
-          pip install types-requests types-aiofiles
+          pip install types-requests types-aiofiles types-PyYAML
           # Install platform deps so Mypy can trace imports
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install -e . || true
@@ -50,10 +50,12 @@ jobs:
         run: ruff check .
 
       - name: 🛡️ Mypy (Static Type Analysis)
-        run: mypy src/ --ignore-missing-imports
+        # FIXED: Pointing to projectdavid_platform instead of src/
+        run: mypy projectdavid_platform --ignore-missing-imports
 
       - name: 🛡️ Bandit (Security Analysis)
-        run: bandit -r src/ -x tests/ -s B101
+        # FIXED: Pointing to projectdavid_platform instead of src/
+        run: bandit -r projectdavid_platform -x tests/ -s B101
 
       - name: 🛡️ Safety (Dependency Scan)
         continue-on-error: true
@@ -81,7 +83,8 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install -e .
       - name: "✅ Run tests"
-        run: pytest tests/ --cov=src --cov-report=term-missing
+        # FIXED: Pointing coverage to projectdavid_platform
+        run: pytest tests/ --cov=projectdavid_platform --cov-report=term-missing
 
   # ──────────────────────────────────────────────────────────────────────────
   # 🚀 Job 3: Semantic Release & PyPI Publish
