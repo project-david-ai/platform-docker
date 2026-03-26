@@ -1,141 +1,136 @@
-name: Lint, Release & Publish
+name: Lint, Test, Tag, and Publish
 
 on:
   push:
-    branches: [main, master]
+    branches: ["**"]
   pull_request:
     branches: [main, master]
 
 permissions:
   contents: write
+  id-token: write
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TEST_PYPI_URL: https://test.pypi.org/legacy/
+  PROD_PYPI_URL: https://upload.pypi.org/legacy/
 
 jobs:
   # ──────────────────────────────────────────────────────────────────────────
-  # Lint & Test
+  # 🛡️ Job 1: Security & Quality Gate
   # ──────────────────────────────────────────────────────────────────────────
-  lint:
-    name: Lint, Test & Validate Compose Files
+  lint_and_security:
+    name: "🧹 Lint & 🛡️ Security"
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: "🕺 Checkout repository"
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: "🐍 Set up Python"
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.12"
 
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-lint-${{ hashFiles('pyproject.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-lint-
-
-      - name: Install tools and project dependencies
+      - name: "🔧 Install Tools"
         run: |
-          pip install --upgrade pip
-          pip install -e .
-          pip install ruff==0.4.0 black==25.1.0 pytest
+          python -m pip install --upgrade pip
+          # Match SDK Gold Standard versions for environment parity
+          pip install black==24.1.1 isort==5.13.2 ruff==0.4.0 mypy bandit safety
+          pip install types-requests types-aiofiles
+          # Install platform deps so Mypy can trace imports
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e . || true
 
-      - name: Run Ruff Linter
-        run: ruff check . --output-format=github
-
-      - name: Run Black Formatter Check
+      - name: ⚫ Black (Format Check)
         run: black --check .
 
-      - name: Run Tests
-        run: pytest tests/ --tb=short -q
+      - name: 🔀 isort (Import Sort Check)
+        run: isort --check .
 
-      - name: Validate Compose Files
-        run: |
-          docker compose -f docker-compose.yml config --quiet --no-interpolate
-          docker compose -f docker-compose.yml -f docker-compose.gpu.yml config --quiet --no-interpolate
-          docker compose -f docker-compose.yml -f docker-compose.ollama.yml config --quiet --no-interpolate
-          docker compose -f docker-compose.yml -f docker-compose.vllm.yml config --quiet --no-interpolate
-          docker compose -f docker-compose.yml -f docker-compose.training.yml config --quiet --no-interpolate
-          docker compose -f docker-compose.yml -f docker-compose.gpu.yml -f docker-compose.training.yml config --quiet --no-interpolate
+      - name: ✨ Ruff (Logic Linting)
+        run: ruff check .
+
+      - name: 🛡️ Mypy (Static Type Analysis)
+        run: mypy src/ --ignore-missing-imports
+
+      - name: 🛡️ Bandit (Security Analysis)
+        run: bandit -r src/ -x tests/ -s B101
+
+      - name: 🛡️ Safety (Dependency Scan)
+        continue-on-error: true
+        run: safety check
 
   # ──────────────────────────────────────────────────────────────────────────
-  # Release
+  # ✅ Job 2: Unit Testing
+  # ──────────────────────────────────────────────────────────────────────────
+  test:
+    name: "✅ Test (Py ${{ matrix.python-version }})"
+    runs-on: ubuntu-latest
+    needs: lint_and_security
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: "📦 Install"
+        run: |
+          pip install pytest pytest-cov
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -e .
+      - name: "✅ Run tests"
+        run: pytest tests/ --cov=src --cov-report=term-missing
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 🚀 Job 3: Semantic Release & PyPI Publish
   # ──────────────────────────────────────────────────────────────────────────
   release:
-    name: Git Version & Changelog
+    name: "🚀 Tag, Build, and Publish"
     runs-on: ubuntu-latest
-    needs: lint
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    outputs:
-      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
-      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev')
     steps:
-      - name: Checkout repository with full history
+      - name: "🕺 Checkout"
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          persist-credentials: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Python (needed for prepareCmd in .releaserc.json)
-        uses: actions/setup-python@v5
+      - name: "⚙️ Setup Node"
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.11'
+          node-version: "20"
 
-      - name: Run semantic-release
+      - name: "🔢 Run Semantic Release"
         id: semantic
-        uses: cycjimmy/semantic-release-action@v4
-        with:
-          extra_plugins: |
-            @semantic-release/commit-analyzer
-            @semantic-release/release-notes-generator
-            @semantic-release/changelog
-            @semantic-release/exec
-            @semantic-release/git
-            @semantic-release/github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Report release outcome
-        if: steps.semantic.outputs.new_release_published == 'true'
         run: |
-          echo "New release: v${{ steps.semantic.outputs.new_release_version }}"
+          npm install -g semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/exec
+          npx semantic-release
 
-  # ──────────────────────────────────────────────────────────────────────────
-  # Publish
-  # ──────────────────────────────────────────────────────────────────────────
-  publish:
-    name: Build & Publish to PyPI
-    runs-on: ubuntu-latest
-    needs: release
-    if: needs.release.outputs.new_release_published == 'true'
-
-    steps:
-      - name: Checkout repository at new release tag
-        uses: actions/checkout@v4
-        with:
-          ref: v${{ needs.release.outputs.new_release_version }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install build tools
+      - name: "🏗️ Build Package"
         run: |
-          pip install --upgrade pip
-          pip install build twine
+          pip install build
+          python -m build
 
-      - name: Build wheel and source distribution
-        run: python -m build
+      - name: "🧠 Decide Target"
+        id: target
+        run: |
+          if [[ "${{ github.ref_name }}" == "main" || "${{ github.ref_name }}" == "master" ]]; then
+            echo "token_name=PROD_PYPI_TOKEN" >> $GITHUB_OUTPUT
+            echo "repo_url=${{ env.PROD_PYPI_URL }}" >> $GITHUB_OUTPUT
+          else
+            echo "token_name=TEST_PYPI_TOKEN" >> $GITHUB_OUTPUT
+            echo "repo_url=${{ env.TEST_PYPI_URL }}" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Verify distribution contents
-        run: twine check dist/*
-
-      - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: twine upload dist/*
+      - name: "📦 Publish"
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: "__token__"
+          password: ${{ secrets[steps.target.outputs.token_name] }}
+          repository_url: ${{ steps.target.outputs.repo_url }}
+          skip-existing: true

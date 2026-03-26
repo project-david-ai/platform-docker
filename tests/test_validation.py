@@ -50,7 +50,9 @@ class TestValidateSecrets:
             "change_me_secret_key",
         ],
     )
-    def test_known_insecure_values_block_startup(self, orchestrator, monkeypatch, bad_value):
+    def test_known_insecure_values_block_startup(
+        self, orchestrator, monkeypatch, bad_value
+    ):
         import secrets as _secrets
 
         for key in orchestrator._GENERATED_SECRETS:
@@ -61,7 +63,9 @@ class TestValidateSecrets:
             orchestrator._validate_secrets()
         assert exc.value.code == 1
 
-    def test_missing_hf_token_warns_but_does_not_block(self, orchestrator, monkeypatch, capsys):
+    def test_missing_hf_token_warns_but_does_not_block(
+        self, orchestrator, monkeypatch, capsys
+    ):
         """
         HF_TOKEN is user-supplied and optional — a missing token must never
         prevent the stack from starting.

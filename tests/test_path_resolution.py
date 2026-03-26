@@ -65,7 +65,9 @@ class TestPackageDataFallback:
                 result = _resolve_compose_file(BASE_COMPOSE_FILE)
                 assert result == str(fake_path)
 
-    def test_returns_filename_and_warns_when_neither_found(self, tmp_path, monkeypatch, caplog):
+    def test_returns_filename_and_warns_when_neither_found(
+        self, tmp_path, monkeypatch, caplog
+    ):
         monkeypatch.chdir(tmp_path)
 
         with patch("importlib.resources.files", side_effect=ModuleNotFoundError):

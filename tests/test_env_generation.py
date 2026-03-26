@@ -57,7 +57,9 @@ class TestSecretUniqueness:
             "secret generation is not random"
         )
 
-    def test_all_generated_secrets_are_unique_within_one_install(self, orchestrator, monkeypatch):
+    def test_all_generated_secrets_are_unique_within_one_install(
+        self, orchestrator, monkeypatch
+    ):
         monkeypatch.setattr(orchestrator, "_prompt_user_required", lambda ev, gl: None)
         env_values = dict(orchestrator._DEFAULT_VALUES)
 
@@ -138,7 +140,9 @@ class TestDatabaseURLConstruction:
 
 
 class TestHFCachePathResolution:
-    def test_hf_cache_path_is_set_when_not_in_environment(self, generated_env, monkeypatch):
+    def test_hf_cache_path_is_set_when_not_in_environment(
+        self, generated_env, monkeypatch
+    ):
         monkeypatch.delenv("HF_CACHE_PATH", raising=False)
         assert "HF_CACHE_PATH=" in generated_env
 

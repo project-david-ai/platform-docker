@@ -1,0 +1,8 @@
+
+# .bandit.yml
+# This ignores subprocess and shell usage because this project is a Docker orchestrator.
+skips:
+  - B404  # Ignore subprocess import warnings
+  - B602  # Ignore subprocess shell=True warnings
+  - B603  # Ignore subprocess without shell=True
+  - B101  # Ignore assert statements (already skipped in pre-commit)

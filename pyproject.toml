@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -10,14 +10,25 @@ readme = "README.md"
 authors = [
   { name = "Francis Neequaye Armah", email = "francis.neequaye@projectdavid.co.uk" }
 ]
-license = { text = "PolyForm Noncommercial 1.0.0" }
+license = { text = "PolyForm Noncommercial License 1.0.0" }
 requires-python = ">=3.9"
 keywords = ["Entities", "ProjectDavid", "Orchestration", "Docker", "Deployment", "LLM"]
 
+# ── Infrastructure Grade Capping ──────────────────────────────────────────
 dependencies = [
-  "PyYAML>=5.4",
-  "python-dotenv>=1.0",
-  "typer>=0.9.0",
+  "PyYAML>=6.0,<7.0",
+  "python-dotenv>=1.0.0,<2.0.0",
+  "typer>=0.9.0,<1.0.0",
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent"
 ]
 
 [project.scripts]
@@ -25,16 +36,22 @@ pdavid = "projectdavid_platform.start_orchestration:entry_point"
 
 [project.optional-dependencies]
 dev = [
-  "black==25.1.0",
-  "isort>=5.12",
+  "black==24.1.1",        # Aligned with SDK Gold Standard
+  "isort==5.13.2",        # Aligned with SDK Gold Standard
   "ruff>=0.4.0",
   "pytest>=7.2",
+  "pytest-cov",
+  "mypy>=1.0",
+  "bandit",
+  "safety",
   "build",
   "twine",
+  "types-PyYAML",         # Type stubs for YAML
 ]
 
 [tool.setuptools.package-data]
 "projectdavid_platform" = [
+  "py.typed",             # Added for PEP 561 support
   "docker-compose.yml",
   "docker-compose.gpu.yml",
   "docker-compose.ollama.yml",
@@ -49,19 +66,17 @@ dev = [
 where = ["."]
 include = ["projectdavid_platform*"]
 
+# ── Unified Formatting (SDK Parity) ───────────────────────────────────────
 [tool.black]
-line-length = 100
-target-version = ["py39"]
+line-length = 88
+target-version = ["py310", "py311", "py312"]
 
 [tool.isort]
 profile = "black"
+line_length = 88
 
 [tool.ruff]
-line-length = 100
+line-length = 88
 
 [tool.pytest.ini_options]
 addopts = "--ignore=tests/integration"
-
-[tool.semantic_release]
-version_source = "tag"
-upload_to_pypi = false

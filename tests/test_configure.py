@@ -15,9 +15,7 @@ import re
 import pytest
 from typer.testing import CliRunner
 
-from projectdavid_platform.start_orchestration import (
-    app,
-)
+from projectdavid_platform.start_orchestration import app
 
 runner = CliRunner()
 
@@ -114,7 +112,9 @@ class TestConfigureValueQuoting:
 
 class TestConfigureRotationWarnings:
     def test_dangerous_rotation_prints_warning(self, populated_env):
-        result = runner.invoke(app, ["configure", "--set", "MYSQL_PASSWORD=newpassword"])
+        result = runner.invoke(
+            app, ["configure", "--set", "MYSQL_PASSWORD=newpassword"]
+        )
         assert "WARNING" in result.output
 
     def test_requires_down_prints_restart_note(self, populated_env):

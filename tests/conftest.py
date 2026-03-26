@@ -95,9 +95,13 @@ def make_orchestrator(base_args, tmp_env, mock_compose_config, monkeypatch):
         _args = args or base_args
 
         # Prevent real compose file loading
-        monkeypatch.setattr(Orchestrator, "_load_compose_config", lambda self: mock_compose_config)
+        monkeypatch.setattr(
+            Orchestrator, "_load_compose_config", lambda self: mock_compose_config
+        )
         # Prevent real .env generation side effects during __init__
-        monkeypatch.setattr(Orchestrator, "_check_for_required_env_file", lambda self: None)
+        monkeypatch.setattr(
+            Orchestrator, "_check_for_required_env_file", lambda self: None
+        )
         monkeypatch.setattr(Orchestrator, "_configure_shared_path", lambda self: None)
         monkeypatch.setattr(Orchestrator, "_configure_hf_cache_path", lambda self: None)
         monkeypatch.setattr(Orchestrator, "_ensure_dockerignore", lambda self: None)

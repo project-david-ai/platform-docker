@@ -47,7 +47,9 @@ class TestShellEnvironmentInheritance:
         # No assertion error means prompt was never called
         assert env_values["HF_TOKEN"] == "hf_from_shell"
 
-    def test_partial_inheritance_only_prompts_for_missing(self, orchestrator, monkeypatch):
+    def test_partial_inheritance_only_prompts_for_missing(
+        self, orchestrator, monkeypatch
+    ):
         """
         If some _USER_REQUIRED keys are in the environment and others are not,
         only the missing ones should be prompted for.
