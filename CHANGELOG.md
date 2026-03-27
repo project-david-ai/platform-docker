@@ -1,3 +1,11 @@
+# [1.27.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.26.0...v1.27.0) (2026-03-27)
+
+
+### Features
+
+* sovereign cluster docker + Gold Standard CI ([882b673](https://github.com/project-david-ai/projectdavid-platform/commit/882b673d4741a5dabc1680f0a134e8d935dffdd6))
+* sovereign cluster docker + Gold Standard CI ([47f63d6](https://github.com/project-david-ai/projectdavid-platform/commit/47f63d68dc27130f1231c20b7bf3b7cabaf340fa))
+
 # [1.26.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.25.1...v1.26.0) (2026-03-26)
 
 
