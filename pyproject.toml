@@ -4,7 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "projectdavid-platform"
-version = "1.27.0"
+version = "1.26.0-dev.2"
+
+
 description = "Deployment orchestrator for the Project David / Entities platform"
 readme = "README.md"
 authors = [
@@ -60,7 +62,6 @@ dev = [
   "docker/nginx/nginx.conf",
   "docker/otel/otel-config.yaml",
   "docker/searxng/settings.yml",
-  "docker-compose.training.yml"
 ]
 
 [tool.setuptools.packages.find]
@@ -81,3 +82,8 @@ line-length = 88
 
 [tool.pytest.ini_options]
 addopts = "--ignore=tests/integration"
+
+[project.urls]
+Homepage = "https://github.com/project-david-ai/projectdavid-platform"
+Documentation = "https://docs.projectdavid.co.uk/docs/platform-overview"
+Changelog = "https://github.com/project-david-ai/projectdavid-platform/blob/main/CHANGELOG.md"
