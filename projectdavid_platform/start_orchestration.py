@@ -689,11 +689,8 @@ class Orchestrator:
                 files += ["-f", self.ollama_compose]
             if vllm:
                 files += ["-f", self.vllm_compose]
-            # --training alone always includes vllm (without ollama)
-            if training and not vllm:
-                files += ["-f", self.vllm_compose]
 
-        # Training overlay is always additive
+        # Training overlay is always additive — vLLM lifecycle managed by DeploymentSupervisor
         if training:
             files += ["-f", self.training_compose]
 
