@@ -1001,55 +1001,90 @@ class Orchestrator:
         Safely injects variables required by a new overlay into an existing .env
         without touching any values that are already set.
 
-        Called when --training (or future overlays) are added to a running stack.
-        Never regenerates secrets. Never overwrites existing values.
-        Logs every variable it adds so the user knows exactly what changed.
+        For the training overlay, if RAY_ADDRESS is not yet set and the terminal
+        is interactive, walks the operator through head vs worker node selection.
 
-        overlay: one of "training", "ollama", "vllm", "gpu"
+        Head node  → RAY_ADDRESS=""   → starts Ray cluster + dashboard
+        Worker node → RAY_ADDRESS set → joins cluster, no dashboard spawned
         """
-        # Variables required per overlay — only injected if absent from .env
         _OVERLAY_VARS = {
             "training": {
                 "TRAINING_PROFILE": "laptop",
-                "RAY_ADDRESS": "",
                 "RAY_DASHBOARD_PORT": "8265",
             },
-            # Future overlays can declare their own required vars here
             "ollama": {},
             "vllm": {},
             "gpu": {},
         }
 
         required = _OVERLAY_VARS.get(overlay, {})
-        if not required:
-            return
 
         env_path = Path(self._ENV_FILE)
         if not env_path.exists():
-            self.log.debug(
-                "_merge_env_for_overlay: .env not found — skipping merge for '%s'",
-                overlay,
-            )
             return
 
         content = env_path.read_text(encoding="utf-8")
         injected: list[str] = []
 
-        for key, default in required.items():
-            # Check both the file content and the live environment
-            if re.search(rf"^{re.escape(key)}=", content, re.MULTILINE):
-                self.log.debug(
-                    "_merge_env_for_overlay: '%s' already in .env — skipping.", key
+        # ── RAY_ADDRESS — interactive cluster join walkthrough (training only) ──
+        if (
+            overlay == "training"
+            and not re.search(r"^RAY_ADDRESS=", content, re.MULTILINE)
+            and not os.environ.get("RAY_ADDRESS", "").strip()
+        ):
+
+            ray_address = ""
+
+            if sys.stdin.isatty():
+                typer.echo("\n" + "=" * 60)
+                typer.echo("  Sovereign Forge — Node Configuration")
+                typer.echo("=" * 60)
+                typer.echo(
+                    "\n  Is this node joining an existing Ray cluster?\n"
+                    "  Answer 'yes' for worker nodes 2..N.\n"
+                    "  Answer 'no' if this is the head node (starts the cluster).\n"
                 )
+                joining = typer.confirm("  Join an existing cluster?", default=False)
+
+                if joining:
+                    ray_address = typer.prompt(
+                        "  Ray cluster address",
+                        default="ray://192.168.1.10:10001",
+                    )
+                    typer.echo(
+                        f"\n  ✓ Worker node configured.\n"
+                        f"  Will join cluster at: {ray_address}\n"
+                        "  This node will NOT start a Ray dashboard.\n"
+                        "  DeploymentSupervisor will reuse the head actor.\n"
+                    )
+                else:
+                    dashboard_port = os.environ.get("RAY_DASHBOARD_PORT", "8265")
+                    typer.echo(
+                        f"\n  ✓ Head node configured.\n"
+                        f"  This node will start the Ray cluster and expose\n"
+                        f"  the dashboard on port {dashboard_port}.\n"
+                        "  Worker nodes should set:\n"
+                        "    RAY_ADDRESS=ray://<this_host_ip>:10001\n"
+                    )
+            else:
+                self.log.info(
+                    "Non-interactive environment — RAY_ADDRESS defaulting to '' (head node)."
+                )
+
+            if not injected:
+                content += "\n# Added by pdavid --training overlay\n"
+            content += f"RAY_ADDRESS={ray_address}\n"
+            os.environ["RAY_ADDRESS"] = ray_address
+            injected.append(
+                f"RAY_ADDRESS={'(head node — empty)' if not ray_address else ray_address}"
+            )
+
+        # ── Remaining required vars ─────────────────────────────────────────────
+        for key, default in required.items():
+            if re.search(rf"^{re.escape(key)}=", content, re.MULTILINE):
                 continue
             if os.environ.get(key, "").strip():
-                self.log.debug(
-                    "_merge_env_for_overlay: '%s' already in environment — skipping.",
-                    key,
-                )
                 continue
-
-            # Inject at end of file with a section comment on first injection
             if not injected:
                 content += "\n# Added by pdavid --training overlay\n"
             content += f"{key}={default}\n"
@@ -1066,6 +1101,7 @@ class Orchestrator:
                 + "\n".join(f"    {k}" for k in injected)
                 + "\n  Edit them any time: pdavid configure --set KEY=VALUE\n"
             )
+            typer.echo("=" * 60 + "\n")
         else:
             self.log.debug(
                 "_merge_env_for_overlay: all required vars for '%s' already present.",
