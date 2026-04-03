@@ -1,3 +1,16 @@
+# [1.30.0-dev.1](https://github.com/project-david-ai/projectdavid-platform/compare/v1.29.0...v1.30.0-dev.1) (2026-04-03)
+
+
+### Bug Fixes
+
+* remove unused result variable in WorkerNodeOrchestrator.join ([5acc1d4](https://github.com/project-david-ai/projectdavid-platform/commit/5acc1d44b58fe49f048c0f5df0213bab3452ed1d))
+
+
+### Features
+
+* migrate to Ray Serve architecture with profile-based training stack ([497ac8d](https://github.com/project-david-ai/projectdavid-platform/commit/497ac8da2f3855277ecd75322c17147c5ac467a8))
+* migrate to Ray Serve architecture with profile-based training stack ([e4b3983](https://github.com/project-david-ai/projectdavid-platform/commit/e4b39833d6f0525ce214a81861456f55ce5e8d54))
+
 # [1.29.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.28.0...v1.29.0) (2026-03-30)
 
 
