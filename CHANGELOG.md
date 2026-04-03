@@ -1,4 +1,4 @@
-# [1.30.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.29.0...v1.30.0) (2026-04-03)
+# [1.30.0-dev.1](https://github.com/project-david-ai/projectdavid-platform/compare/v1.29.0...v1.30.0-dev.1) (2026-04-03)
 
 
 ### Bug Fixes
@@ -8,7 +8,6 @@
 
 ### Features
 
-* migrate to Ray Serve architecture with profile-based training stack ([25b9c1b](https://github.com/project-david-ai/projectdavid-platform/commit/25b9c1be949616dbc0e969749a67b0680fde02a0))
 * migrate to Ray Serve architecture with profile-based training stack ([497ac8d](https://github.com/project-david-ai/projectdavid-platform/commit/497ac8da2f3855277ecd75322c17147c5ac467a8))
 * migrate to Ray Serve architecture with profile-based training stack ([e4b3983](https://github.com/project-david-ai/projectdavid-platform/commit/e4b39833d6f0525ce214a81861456f55ce5e8d54))
 
