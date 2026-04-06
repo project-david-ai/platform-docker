@@ -77,7 +77,6 @@ def validate_license(license_path: Optional[str] = None) -> LicenseResult:
     try:
         from cryptography.exceptions import InvalidSignature
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-        from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
     except ImportError:
         # cryptography not installed — skip validation (dev mode)
         return LicenseResult(
