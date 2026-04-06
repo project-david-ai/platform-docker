@@ -12,7 +12,6 @@ License file (.pdavid.lic) is placed in the project root by the customer.
 import base64
 import json
 import os
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -212,10 +211,10 @@ def enforce_license(verbose: bool = False) -> None:
 
     if result.status == LicenseStatus.GRACE:
         days_left = GRACE_PERIOD_DAYS - result.days_in_grace
-        typer.echo(f"  ⚠️  No license file found.")
+        typer.echo("  ⚠️  No license file found.")
         typer.echo(f"  Grace period    : {days_left} day(s) remaining")
         typer.echo(
-            f"\n  Project David Platform requires a commercial license for production use."
+            "\n  Project David Platform requires a commercial license for production use."
         )
         typer.echo(f"  Contact : {CONTACT_EMAIL}")
         typer.echo(f"  Website : {CONTACT_URL}")
