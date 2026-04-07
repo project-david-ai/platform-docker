@@ -1,6 +1,6 @@
 # Pinned Docker Images — Project David Platform
 
-> **Last pinned:** 2026-04-04
+> **Last pinned:** 2026-04-07
 > **Stack tested:** base + Sovereign Forge training profile
 > **Method:** SHA256 digest — cryptographically immutable, tag-independent
 > **Environment:** NVIDIA RTX 4060 Laptop GPU · CUDA 12.8 · Ubuntu (WSL2)
@@ -50,17 +50,18 @@ When intentionally upgrading an image:
 
 ## First-Party Images (thanosprime/*)
 
-Built and published by Project David CI. Pinned per platform release via
-the release tag, not digest — they are rebuilt on every core push and
-version-tracked through semantic-release.
+Built and published by Project David CI. Pinned by SHA256 digest per platform
+release. Rebuilt on every core push and version-tracked through semantic-release.
 
-| Service | Image |
-|---------|-------|
-| Core API | `thanosprime/projectdavid-core-api` |
-| Sandbox | `thanosprime/projectdavid-core-sandbox` |
-| Training API | `thanosprime/projectdavid-core-training-api` |
-| Training Worker | `thanosprime/projectdavid-core-training-worker` |
-| Inference Worker | `thanosprime/projectdavid-core-inference-worker` |
+| Service | Image | Digest | Pinned |
+|---------|-------|--------|--------|
+| Core API | `thanosprime/projectdavid-core-api` | `sha256:39195509a2ae854c353cf8fcf7867be66162c506b764f1154a761f0c083986d6` | 2026-04-07 |
+| Sandbox | `thanosprime/projectdavid-core-sandbox` | `sha256:79d74dbb1e9866edc5d8a1ab5e04806a2b163129310008fe6068a471c3e5c99c` | 2026-04-07 |
+| Training API | `thanosprime/projectdavid-core-training-api` | `sha256:e10f351081de1e927214a2a0e68a6e3c539b0480357ac77bf877c0a14177469a` | 2026-04-07 |
+| Training Worker | `thanosprime/projectdavid-core-training-worker` | `sha256:e10f351081de1e927214a2a0e68a6e3c539b0480357ac77bf877c0a14177469a` | 2026-04-07 |
+| Inference Worker | `thanosprime/projectdavid-core-inference-worker` | `sha256:a2b4dcfdb81e2093438064daa9c9ce33803a73ad23091978b7b80b164535c6f4` | 2026-04-07 |
+
+> Note: training-api and training-worker share the same Dockerfile and therefore the same digest. They are differentiated by their `command` directive in the compose file.
 
 ---
 
