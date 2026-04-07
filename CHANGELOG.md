@@ -1,3 +1,10 @@
+# [1.34.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.33.2...v1.34.0) (2026-04-07)
+
+
+### Features
+
+* **platform:** pin core images to v1.27.x digests, add NODE_IP opt-in, fix duplicate HF_TOKEN ([0d63442](https://github.com/project-david-ai/projectdavid-platform/commit/0d634421fc80eeaccf49f8410b8b9c76bda4b61d))
+
 ## [1.33.2](https://github.com/project-david-ai/projectdavid-platform/compare/v1.33.1...v1.33.2) (2026-04-07)
 
 
