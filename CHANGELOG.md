@@ -1,3 +1,10 @@
+## [1.33.2](https://github.com/project-david-ai/projectdavid-platform/compare/v1.33.1...v1.33.2) (2026-04-07)
+
+
+### Bug Fixes
+
+* **platform:** remove duplicate HF_TOKEN entries in inference and training worker ([5f975ac](https://github.com/project-david-ai/projectdavid-platform/commit/5f975ac060e8d3dc28f55b31a692c006ab31b644))
+
 ## [1.33.1](https://github.com/project-david-ai/projectdavid-platform/compare/v1.33.0...v1.33.1) (2026-04-07)
 
 
