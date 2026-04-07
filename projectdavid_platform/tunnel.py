@@ -34,7 +34,7 @@ import subprocess  # nosec B404
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlparse
@@ -527,7 +527,7 @@ class TunnelRunner:
             ok(
                 f"Tunnel '{self.name}' running in background (PID {self._proc.pid if self._proc else '?'})"
             )
-            typer.echo(f"  Check status : pdavid tunnel status")
+            typer.echo("  Check status : pdavid tunnel status")
             typer.echo(f"  Stop         : pdavid tunnel stop --name {self.name}")
             typer.echo("")
             # Detach — watchdog keeps running
