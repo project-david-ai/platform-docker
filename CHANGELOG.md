@@ -1,3 +1,10 @@
+## [1.33.1](https://github.com/project-david-ai/projectdavid-platform/compare/v1.33.0...v1.33.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* **tunnel:** move MySQL forward outside Redis else branch, use remote port 3308 ([763d7ba](https://github.com/project-david-ai/projectdavid-platform/commit/763d7bae5b9d2f62a2d3efaf6d639bad03875bd0))
+
 # [1.33.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.32.1...v1.33.0) (2026-04-07)
 
 
