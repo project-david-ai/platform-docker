@@ -28,6 +28,10 @@
 #     RAY_ADDRESS=ray://<head_ip>:10001
 #   Then: docker compose -f docker-compose.yml -f docker-compose.training.yml up -d training-worker
 #   No code changes required — Ray discovers the node automatically.
+#
+# IMAGE PINNING
+# ─────────────
+# Pinned: 2026-04-07 | Core: v1.27.x
 
 services:
 
@@ -35,7 +39,8 @@ services:
   # training-api — Fine-tuning REST API (no GPU required)
   # ---------------------------------------------------------------------------
   training-api:
-    image: thanosprime/projectdavid-core-training-api:latest
+    # v1.27.x — upgrade to next core release on next bump
+    image: thanosprime/projectdavid-core-training-api@sha256:e10f351081de1e927214a2a0e68a6e3c539b0480357ac77bf877c0a14177469a
     container_name: training_api
     restart: unless-stopped
     env_file:
@@ -66,7 +71,8 @@ services:
   # training-worker — GPU worker + Ray head node
   # ---------------------------------------------------------------------------
   training-worker:
-    image: thanosprime/projectdavid-core-training-worker:latest
+    # v1.27.x — upgrade to next core release on next bump
+    image: thanosprime/projectdavid-core-training-worker@sha256:e10f351081de1e927214a2a0e68a6e3c539b0480357ac77bf877c0a14177469a
     container_name: training_worker
     restart: unless-stopped
     # The published image has an incorrect default CMD (uvicorn).
