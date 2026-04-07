@@ -1,3 +1,10 @@
+## [1.32.1](https://github.com/project-david-ai/projectdavid-platform/compare/v1.32.0...v1.32.1) (2026-04-07)
+
+
+### Bug Fixes
+
+* **platform:** pass HF_TOKEN and HF_HUB_OFFLINE to worker node docker run command ([a364d42](https://github.com/project-david-ai/projectdavid-platform/commit/a364d42f9f1337bf11b3b33af5fdd380bf8345cf))
+
 # [1.32.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.31.2...v1.32.0) (2026-04-06)
 
 
