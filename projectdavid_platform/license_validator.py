@@ -200,6 +200,8 @@ def enforce_license(verbose: bool = False) -> None:
     _print_header()
 
     if result.status == LicenseStatus.VALID:
+        assert result.expires_at is not None
+        assert result.days_remaining is not None
         typer.echo(f"  ✅ Licensed to  : {result.customer}")
         typer.echo(f"  📋 Org ID       : {result.org_id}")
         typer.echo(
@@ -214,6 +216,7 @@ def enforce_license(verbose: bool = False) -> None:
         return
 
     if result.status == LicenseStatus.GRACE:
+        assert result.days_in_grace is not None
         days_left = GRACE_PERIOD_DAYS - result.days_in_grace
         typer.echo("  ⚠️  No license file found.")
         typer.echo(f"  Grace period    : {days_left} day(s) remaining")
@@ -232,6 +235,7 @@ def enforce_license(verbose: bool = False) -> None:
     if result.status == LicenseStatus.MISSING:
         _print_license_required("No license file found and grace period has expired.")
     elif result.status == LicenseStatus.EXPIRED:
+        assert result.expires_at is not None
         _print_license_required(
             f"License expired on {result.expires_at.strftime('%Y-%m-%d')}."
         )
