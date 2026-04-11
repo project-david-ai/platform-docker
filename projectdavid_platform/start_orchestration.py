@@ -92,7 +92,6 @@ try:
 except ImportError:
     _LICENSE_AVAILABLE = False
 
-
 # ---------------------------------------------------------------------------
 # Logging
 # ---------------------------------------------------------------------------
@@ -1199,9 +1198,16 @@ class Orchestrator:
 
     def _handle_down(self):
         target_services = getattr(self.args, "services", None) or []
-        down_cmd = (
-            ["docker", "compose"] + self._compose_files() + ["down", "--remove-orphans"]
-        )
+        down_cmd = ["docker", "compose"] + self._compose_files()
+
+        # Always include training profile on down — idempotent if not running.
+        # Guard against double-injection if --training was passed explicitly
+        # (which causes _compose_files() to already include --profile training).
+        if not getattr(self.args, "training", False):
+            down_cmd += ["--profile", "training"]
+
+        down_cmd += ["down", "--remove-orphans"]
+
         if getattr(self.args, "clear_volumes", False):
             down_cmd.append("--volumes")
         if target_services:
@@ -1528,10 +1534,6 @@ class WorkerNodeOrchestrator:
             "PYTHONUNBUFFERED=1",
             "--env",
             "RAY_IGNORE_VERSION_MISMATCH=1",
-            "--env",
-            f"HF_TOKEN={os.environ.get('HF_TOKEN', '')}",
-            "--env",
-            "HF_HUB_OFFLINE=0",
             "--restart",
             "unless-stopped",
             image,
