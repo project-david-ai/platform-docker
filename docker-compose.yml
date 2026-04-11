@@ -238,12 +238,14 @@ services:
       - UPSTREAM_URL=http://api:9000
       - LISTEN_PORT=9100
       - LOG_LEVEL=pd_router=info
+
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9100/_router/health"]
+      test: [ "CMD-SHELL", "echo > /dev/tcp/localhost/9100 2>/dev/null && echo ok || exit 1" ]
       interval: 10s
       timeout: 3s
       start_period: 5s
       retries: 3
+
     depends_on:
       - api
     networks:
