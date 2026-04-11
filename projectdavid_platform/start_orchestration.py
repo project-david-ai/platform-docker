@@ -52,6 +52,14 @@ import typer
 #   CACHE INSPECTION
 #   pdavid cache                        # Scan HF cache in inference_worker
 #   pdavid cache --node inference_worker_2   # Target a specific worker node
+#
+#   RAY CLUSTER MANAGEMENT
+#   pdavid ray --status                          # Cluster nodes + resource summary
+#   pdavid ray --deployments                     # List active Ray Serve deployments
+#   pdavid ray --gpu                             # nvidia-smi GPU memory usage
+#   pdavid ray --dashboard                       # Print Ray dashboard URL
+#   pdavid ray --kill vllm_dep_WwY4...           # Tear down a deployment by name
+#   pdavid ray --status --node inference_worker_2  # Target a specific node
 # ---------------------------------------------------------------------------
 
 
@@ -2000,6 +2008,169 @@ def cache_inspect(
             raise SystemExit(0)
         _exec(["rm", "-rf", cache_path])
         typer.echo(f"  Deleted. Run 'pdavid cache --list --node {node}' to verify.")
+
+
+@app.command(name="ray")
+def ray_manage(
+    status: bool = typer.Option(
+        False,
+        "--status",
+        "-s",
+        help="Show Ray cluster status — nodes, resources, and GPU availability.",
+    ),
+    deployments: bool = typer.Option(
+        False,
+        "--deployments",
+        "-d",
+        help="List all active Ray Serve deployments and their replica health.",
+    ),
+    gpu: bool = typer.Option(
+        False,
+        "--gpu",
+        "-g",
+        help="Show GPU memory usage via nvidia-smi inside the inference worker.",
+    ),
+    dashboard: bool = typer.Option(
+        False, "--dashboard", help="Print the Ray dashboard URL."
+    ),
+    kill: Optional[str] = typer.Option(
+        None,
+        "--kill",
+        "-k",
+        help="Tear down a specific Ray Serve deployment by name (e.g. vllm_dep_...).",
+    ),
+    node: str = typer.Option(
+        INFERENCE_WORKER_CONTAINER,
+        "--node",
+        help="Container name to target. Defaults to inference_worker.",
+    ),
+    verbose: bool = typer.Option(False, "--verbose", help="Enable debug logging."),
+) -> None:
+    """
+    Inspect and manage the Ray cluster and Ray Serve deployments.
+
+    Examples:\n
+      pdavid ray --status\n
+      pdavid ray --deployments\n
+      pdavid ray --gpu\n
+      pdavid ray --dashboard\n
+      pdavid ray --kill vllm_dep_WwY4uagFG1wDImm93xQ7qf\n
+      pdavid ray --status --node inference_worker_2\n
+    """
+    args = SimpleNamespace(
+        verbose=verbose, training=False, ollama=False, vllm=False, gpu=False
+    )
+    o = Orchestrator(args)
+
+    if not any([status, deployments, gpu, dashboard, kill]):
+        # Default to --status if no flag given
+        status = True
+
+    if not o._is_container_running(node):
+        typer.echo(
+            f"\n  [error] Container '{node}' is not running.\n"
+            f"  Start the training stack first:\n"
+            f"    pdavid --mode up --training\n",
+            err=True,
+        )
+        raise SystemExit(1)
+
+    def _exec(cmd: list, check: bool = True) -> Optional[str]:
+        try:
+            result = subprocess.run(
+                ["docker", "exec", node] + cmd,
+                check=check,
+                text=True,
+                capture_output=True,
+                shell=o.is_windows,  # nosec B602
+            )
+            if result.stdout:
+                typer.echo(result.stdout)
+            if result.stderr:
+                typer.echo(result.stderr, err=True)
+            return result.stdout
+        except subprocess.CalledProcessError as e:
+            typer.echo(f"\n  [error] Command failed (code {e.returncode}).\n", err=True)
+            if e.stdout:
+                typer.echo(e.stdout)
+            if e.stderr:
+                typer.echo(e.stderr, err=True)
+            raise SystemExit(1)
+
+    if dashboard:
+        port = os.environ.get("RAY_DASHBOARD_PORT", "8265")
+        typer.echo(f"\n  Ray dashboard: http://localhost:{port}")
+        typer.echo(f"  Cluster nodes, GPU resources, and active Serve deployments.\n")
+
+    if status:
+        typer.echo(f"\n  Ray cluster status — {node}")
+        typer.echo("=" * 60)
+        _exec(
+            [
+                "python",
+                "-c",
+                (
+                    "import ray; ray.init(address='auto', ignore_reinit_error=True); "
+                    "print(ray.cluster_resources()); "
+                    "print(ray.available_resources())"
+                ),
+            ]
+        )
+
+    if deployments:
+        typer.echo(f"\n  Ray Serve deployments — {node}")
+        typer.echo("=" * 60)
+        _exec(
+            [
+                "python",
+                "-c",
+                (
+                    "from ray import serve; "
+                    "import ray; ray.init(address='auto', ignore_reinit_error=True); "
+                    "serve.start(detached=True); "
+                    "status = serve.status(); "
+                    "[print(f'  {name:<45} {app.status}') "
+                    " for name, app in status.applications.items()] "
+                    "if status.applications else print('  No active deployments.')"
+                ),
+            ]
+        )
+
+    if gpu:
+        typer.echo(f"\n  GPU memory usage — {node}")
+        typer.echo("=" * 60)
+        _exec(
+            [
+                "nvidia-smi",
+                "--query-gpu=name,memory.used,memory.free,memory.total,utilization.gpu",
+                "--format=csv,noheader,nounits",
+            ]
+        )
+
+    if kill:
+        typer.echo(f"\n  Killing deployment: {kill}")
+        typer.echo("=" * 60)
+        confirmed = typer.confirm(
+            f"  This will tear down '{kill}' and free its GPU memory. Proceed?",
+            default=False,
+        )
+        if not confirmed:
+            typer.echo("  Aborted.")
+            raise SystemExit(0)
+        _exec(
+            [
+                "python",
+                "-c",
+                (
+                    f"import ray; ray.init(address='auto', ignore_reinit_error=True); "
+                    f"from ray import serve; "
+                    f"serve.start(detached=True); "
+                    f"serve.delete('{kill}'); "
+                    f"print('  Deployment {kill} deleted. GPU memory released.')"
+                ),
+            ]
+        )
+        typer.echo(f"\n  Run 'pdavid ray --deployments' to confirm.")
 
 
 def entry_point():
