@@ -1,3 +1,18 @@
+# [1.39.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.38.0...v1.39.0) (2026-04-15)
+
+
+### Bug Fixes
+
+* **security:** suppress B105 false positive on HF_TOKEN empty default ([0d29424](https://github.com/project-david-ai/projectdavid-platform/commit/0d29424be7f76245b502bbf12b60082716c22a8e))
+
+
+### Features
+
+* **orchestrator:** add compose-file audit with backup and auto-replace ([d08ccfa](https://github.com/project-david-ai/projectdavid-platform/commit/d08ccfa390c5c6de757847bf4dccfd2a7a481bdb))
+* **telemetry:** add opt-in anonymous usage analytics via PostHog ([0174308](https://github.com/project-david-ai/projectdavid-platform/commit/0174308c4c65e7e5e81e337294f03b07daaeccd9))
+* **telemetry:** add opt-in anonymous usage analytics via PostHog ([aa0f8b9](https://github.com/project-david-ai/projectdavid-platform/commit/aa0f8b9ec676c11e773be09d6c5e87b483b729a0))
+* **telemetry:** migrate existing installs to telemetry on first 1.38 run ([8205404](https://github.com/project-david-ai/projectdavid-platform/commit/82054046ca7fe3b528a4ab7f8fe0d0d9bd7865ab))
+
 # [1.38.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.37.0...v1.38.0) (2026-04-13)
 
 
