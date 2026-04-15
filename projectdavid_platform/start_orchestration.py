@@ -540,6 +540,69 @@ class Orchestrator:
             typer.echo("\n  No data will be collected.\n")
         typer.echo("=" * 60 + "\n")
 
+    def _migrate_env_telemetry(self) -> None:
+        """
+        Backfill TELEMETRY and PDAVID_INSTALL_ID into an existing .env that
+        predates the telemetry feature (1.38.0).
+
+        Called after load_dotenv so os.environ is already populated.
+        Only fires when PDAVID_INSTALL_ID is absent — i.e. exactly once
+        per existing install, then never again.
+        """
+        env_path = Path(self._ENV_FILE)
+        if not env_path.exists():
+            return
+
+        # Already migrated — nothing to do.
+        if os.environ.get("PDAVID_INSTALL_ID", "").strip():
+            return
+
+        self.log.info("Migrating .env — adding telemetry fields.")
+
+        install_id = f"inst_{secrets.token_hex(16)}"
+
+        if sys.stdin.isatty():
+            typer.echo("\n" + "=" * 60)
+            typer.echo("  One-time update — anonymous analytics (opt-in)")
+            typer.echo("=" * 60)
+            typer.echo(
+                "\n"
+                "  projectdavid 1.38 adds optional anonymous usage analytics.\n"
+                "\n"
+                "  What is collected:\n"
+                "    - pdavid version and command name\n"
+                "    - Active flags (--training, --ollama, etc.)\n"
+                "    - OS platform and Python version\n"
+                "    - A random install ID (stored in .env, never linked to you)\n"
+                "\n"
+                "  What is NEVER collected:\n"
+                "    - Secrets, API keys, tokens, IPs, hostnames, file contents\n"
+                "\n"
+                "  Opt out any time:\n"
+                "    pdavid configure --set TELEMETRY=false\n"
+            )
+            enabled = typer.confirm("  Enable anonymous analytics?", default=True)
+            typer.echo()
+        else:
+            enabled = True
+
+        telemetry_value = "true" if enabled else "false"
+
+        content = env_path.read_text(encoding="utf-8")
+        content += (
+            "\n#############################\n"
+            "# Telemetry\n"
+            "#############################\n"
+            f"TELEMETRY={telemetry_value}\n"
+            f"PDAVID_INSTALL_ID={install_id}\n"
+        )
+        env_path.write_text(content, encoding="utf-8")
+
+        os.environ["TELEMETRY"] = telemetry_value
+        os.environ["PDAVID_INSTALL_ID"] = install_id
+
+        self.log.info("Telemetry fields written to .env.")
+
     def _detect_ci(self) -> Optional[str]:
         """
         Return the name of the CI platform if we're running inside a known
@@ -720,7 +783,6 @@ class Orchestrator:
         for pkg_rel, cwd_rel in _AUDITED_FILES:
             local = Path.cwd() / cwd_rel
             if not local.exists():
-                # Never installed — _ensure_config_files handles first-run.
                 continue
 
             bundled_hash = self._bundled_sha256(pkg_rel)
@@ -740,7 +802,6 @@ class Orchestrator:
             )
             return []
 
-        # ── Print report ──────────────────────────────────────────────────────
         typer.echo("\n" + "=" * 62)
         typer.echo("  Compose-file audit — updates available")
         typer.echo("=" * 62)
@@ -767,7 +828,6 @@ class Orchestrator:
         if not interactive:
             return stale_paths
 
-        # ── Non-interactive shell guard ────────────────────────────────────────
         if not sys.stdin.isatty():
             typer.echo(
                 "\n  [info] Non-interactive environment — skipping replacement.\n"
@@ -775,7 +835,6 @@ class Orchestrator:
             )
             return stale_paths
 
-        # ── Single Y/N prompt ─────────────────────────────────────────────────
         replace = typer.confirm(
             "\n  Replace all stale file(s) with the bundled versions?",
             default=False,
@@ -788,7 +847,6 @@ class Orchestrator:
             )
             return stale_paths
 
-        # ── Backup ────────────────────────────────────────────────────────────
         ts = time.strftime("%Y%m%d_%H%M%S")
         try:
             pkg_ver = importlib.metadata.version("projectdavid-platform")
@@ -814,7 +872,6 @@ class Orchestrator:
                 failed.append(cwd_rel)
                 continue
 
-            # Replace with bundled copy
             try:
                 pkg_files = importlib.resources.files(PACKAGE_NAME)
                 resource = pkg_files
@@ -826,7 +883,6 @@ class Orchestrator:
                 typer.echo(f"  ✓  {cwd_rel}")
             except Exception as e:
                 self.log.error("Could not replace '%s': %s", cwd_rel, e)
-                # Restore backup so the user is never left with a partial file.
                 try:
                     shutil.copy2(dest_backup, local)
                     self.log.info("Restored backup of '%s'.", cwd_rel)
@@ -919,7 +975,6 @@ class Orchestrator:
     def _preflight(self) -> bool:
         self.log.debug("Running preflight dependency checks...")
 
-        # ── License check ────────────────────────────────────────────────────
         if _LICENSE_AVAILABLE:
             enforce_license()
         else:
@@ -1267,6 +1322,7 @@ class Orchestrator:
         else:
             self.log.info("'%s' exists — loading.", self._ENV_FILE)
             load_dotenv(dotenv_path=self._ENV_FILE, override=True)
+            self._migrate_env_telemetry()  # backfill telemetry fields if missing
 
     def _configure_shared_path(self):
         system = _platform.system().lower()
@@ -1567,9 +1623,6 @@ class Orchestrator:
         target_services = getattr(self.args, "services", None) or []
         down_cmd = ["docker", "compose"] + self._compose_files()
 
-        # Always include training profile on down — idempotent if not running.
-        # Guard against double-injection if --training was passed explicitly
-        # (which causes _compose_files() to already include --profile training).
         if not getattr(self.args, "training", False):
             down_cmd += ["--profile", "training"]
 
@@ -2023,6 +2076,9 @@ def main(
     AUDIT:\n
       pdavid audit\n
       pdavid audit --check\n
+
+    TELEMETRY:\n
+      pdavid configure --set TELEMETRY=false\n
     """
     if ctx.invoked_subcommand is not None:
         return
