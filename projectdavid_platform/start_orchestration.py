@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib.metadata
 import importlib.resources
+import json
 import logging
 import os
 import platform as _platform
@@ -12,7 +13,10 @@ import shutil
 import socket as _socket
 import subprocess  # nosec B404
 import sys
+import threading
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 from types import SimpleNamespace
 from typing import List, Optional
@@ -65,6 +69,9 @@ import typer
 #   COMPOSE-FILE AUDIT
 #   pdavid audit                        # Interactive — prompts to replace stale files
 #   pdavid audit --check                # CI-safe — exits 1 if any files are stale
+#
+#   TELEMETRY (opt-in, prompted on first run)
+#   pdavid configure --set TELEMETRY=false   # Opt out at any time
 # ---------------------------------------------------------------------------
 
 
@@ -130,6 +137,18 @@ PACKAGE_NAME = "projectdavid_platform"
 CHANGELOG_URL = "https://github.com/project-david-ai/platform/blob/master/CHANGELOG.md"
 
 INFERENCE_WORKER_CONTAINER = "inference_worker"
+
+# ---------------------------------------------------------------------------
+# Telemetry
+# ---------------------------------------------------------------------------
+# Anonymous opt-in usage analytics via PostHog.
+# Collected: event name, pdavid version, platform, python version, active
+# flags (--training / --ollama etc.), and a random install ID that is
+# generated once and stored in .env. No secrets, no IPs, no model data.
+# Users are prompted on first run and can opt out at any time:
+#   pdavid configure --set TELEMETRY=false
+POSTHOG_API_KEY = "phc_CVVzzR93zv8wKdHwAeeotoScucAPdEcdwZaD99MAjm8B"
+POSTHOG_ENDPOINT = "https://us.i.posthog.com/capture/"
 
 # Files bootstrapped into the CWD on first run (skipped if already present).
 _BUNDLED_CONFIGS = [
@@ -204,7 +223,8 @@ _TYPER_HELP = (
     "  pdavid worker --join <head-node-ip>\n\n"
     "Config:     pdavid configure --set HF_TOKEN=hf_abc123\n"
     "Admin:      pdavid bootstrap-admin\n"
-    "Audit:      pdavid audit"
+    "Audit:      pdavid audit\n"
+    "Telemetry:  pdavid configure --set TELEMETRY=false  # opt out"
 )
 
 app = typer.Typer(
@@ -317,6 +337,8 @@ class Orchestrator:
         "TOGETHER_BASE_URL": "https://api.together.xyz/v1",
         "LOG_LEVEL": "INFO",
         "PYTHONUNBUFFERED": "1",
+        "TELEMETRY": "true",
+        "PDAVID_INSTALL_ID": "",  # generated on first run
     }
 
     _ENV_STRUCTURE = {
@@ -380,6 +402,7 @@ class Orchestrator:
             "TOOL_VECTOR_STORE_SEARCH",
         ],
         "Other": ["PDAVID_VERSION", "LOG_LEVEL", "PYTHONUNBUFFERED"],
+        "Telemetry": ["TELEMETRY", "PDAVID_INSTALL_ID"],
     }
 
     _SUMMARY_KEYS = [
@@ -415,6 +438,7 @@ class Orchestrator:
             self._merge_env_for_training()
 
         self._ensure_dockerignore()
+        self._send_telemetry("pdavid_startup", {})
 
     @property
     def _env_file_abs(self) -> str:
@@ -463,6 +487,140 @@ class Orchestrator:
             os.environ["PDAVID_VERSION"] = version
         except Exception as e:
             self.log.debug("Could not update PDAVID_VERSION in .env: %s", e)
+
+    # ------------------------------------------------------------------
+    # Telemetry
+    # ------------------------------------------------------------------
+
+    def _prompt_telemetry(self, env_values: dict) -> None:
+        """
+        Ask once on first-run whether the user wants to share anonymous
+        usage stats. Stores TELEMETRY and PDAVID_INSTALL_ID in env_values.
+        Skips the prompt in non-interactive environments (defaults to True).
+        """
+        if not sys.stdin.isatty():
+            env_values["TELEMETRY"] = "true"
+            env_values["PDAVID_INSTALL_ID"] = f"inst_{secrets.token_hex(16)}"
+            return
+
+        typer.echo("\n" + "=" * 60)
+        typer.echo("  Anonymous usage analytics (opt-in)")
+        typer.echo("=" * 60)
+        typer.echo(
+            "\n"
+            "  Help improve projectdavid by sharing anonymous usage stats.\n"
+            "\n"
+            "  What is collected:\n"
+            "    - pdavid version and command name (e.g. pdavid_up)\n"
+            "    - Active flags (--training, --ollama, etc.)\n"
+            "    - OS platform and Python version\n"
+            "    - A random install ID (generated once, stored in .env)\n"
+            "\n"
+            "  What is NEVER collected:\n"
+            "    - Secrets, API keys, or tokens\n"
+            "    - IP addresses or hostnames\n"
+            "    - Model names or training data\n"
+            "    - Any file contents\n"
+            "\n"
+            "  Opt out any time:\n"
+            "    pdavid configure --set TELEMETRY=false\n"
+        )
+        enabled = typer.confirm("  Enable anonymous analytics?", default=True)
+        env_values["TELEMETRY"] = "true" if enabled else "false"
+        env_values["PDAVID_INSTALL_ID"] = f"inst_{secrets.token_hex(16)}"
+        os.environ["TELEMETRY"] = env_values["TELEMETRY"]
+        os.environ["PDAVID_INSTALL_ID"] = env_values["PDAVID_INSTALL_ID"]
+
+        if enabled:
+            typer.echo(
+                "\n  Thank you. You can opt out any time with:\n"
+                "    pdavid configure --set TELEMETRY=false\n"
+            )
+        else:
+            typer.echo("\n  No data will be collected.\n")
+        typer.echo("=" * 60 + "\n")
+
+    def _detect_ci(self) -> Optional[str]:
+        """
+        Return the name of the CI platform if we're running inside a known
+        CI environment, or None if this looks like a real user machine.
+
+        Detection is purely env-var based — no network calls, no side effects.
+        """
+        checks = [
+            ("GITHUB_ACTIONS", "github_actions"),
+            ("GITLAB_CI", "gitlab_ci"),
+            ("CIRCLECI", "circleci"),
+            ("TRAVIS", "travis_ci"),
+            ("JENKINS_URL", "jenkins"),
+            ("BITBUCKET_BUILD_NUMBER", "bitbucket_pipelines"),
+            ("DRONE", "drone_ci"),
+            ("BUILDKITE", "buildkite"),
+            ("TF_BUILD", "azure_devops"),
+            ("TEAMCITY_VERSION", "teamcity"),
+            ("CODEBUILD_BUILD_ID", "aws_codebuild"),
+            ("HEROKU_TEST_RUN_ID", "heroku_ci"),
+            ("CI", "generic_ci"),  # catch-all — must be last
+        ]
+        for env_var, platform in checks:
+            if os.environ.get(env_var):
+                return platform
+        return None
+
+    def _send_telemetry(self, event: str, properties: dict) -> None:
+        """
+        Fire-and-forget telemetry event to PostHog.
+        Runs in a daemon thread — never blocks the CLI.
+        Silently swallows all exceptions.
+        """
+        if os.environ.get("TELEMETRY", "true").lower() != "true":
+            return
+
+        install_id = os.environ.get("PDAVID_INSTALL_ID", "unknown")
+        if not install_id or install_id == "unknown":
+            return  # .env not yet generated — skip silently
+
+        try:
+            version = importlib.metadata.version("projectdavid-platform")
+        except importlib.metadata.PackageNotFoundError:
+            version = "unknown"
+
+        ci_platform = self._detect_ci()
+        payload = {
+            "api_key": POSTHOG_API_KEY,
+            "event": event,
+            "distinct_id": install_id,
+            "properties": {
+                "version": version,
+                "platform": _platform.system().lower(),
+                "python": f"{sys.version_info.major}.{sys.version_info.minor}",
+                "mode": getattr(self.args, "mode", "unknown"),
+                "flags": [
+                    f
+                    for f in ("training", "ollama", "vllm", "gpu")
+                    if getattr(self.args, f, False)
+                ],
+                "ci": ci_platform is not None,
+                "ci_platform": ci_platform,  # None → real user, string → CI system
+                **properties,
+            },
+        }
+
+        def _post() -> None:
+            try:
+                data = json.dumps(payload).encode("utf-8")
+                req = urllib.request.Request(
+                    POSTHOG_ENDPOINT,
+                    data=data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=3) as _:  # nosec B310
+                    pass
+            except Exception as telemetry_err:
+                self.log.debug("Telemetry skipped: %s", telemetry_err)
+
+        threading.Thread(target=_post, daemon=True).start()
 
     # ------------------------------------------------------------------
     # Config file bootstrap
@@ -672,9 +830,9 @@ class Orchestrator:
                 try:
                     shutil.copy2(dest_backup, local)
                     self.log.info("Restored backup of '%s'.", cwd_rel)
-                except Exception as restore_e:
+                except Exception as restore_err:
                     self.log.debug(
-                        "Failed to restore backup of '%s': %s", cwd_rel, restore_e
+                        "Failed to restore backup of '%s': %s", cwd_rel, restore_err
                     )
                 failed.append(cwd_rel)
 
@@ -1037,6 +1195,7 @@ class Orchestrator:
             )
 
         self._prompt_user_required(env_values, generation_log)
+        self._prompt_telemetry(env_values)
 
         env_lines = [
             f"# Auto-generated by projectdavid-platform — {time.strftime('%Y-%m-%d %H:%M:%S %Z')}",
@@ -1399,7 +1558,9 @@ class Orchestrator:
         try:
             self._run_command(up_cmd, check=True)
             self.log.info("Stack started successfully.")
+            self._send_telemetry("pdavid_up", {"services": target or "all"})
         except subprocess.CalledProcessError:
+            self._send_telemetry("pdavid_up_failed", {})
             raise SystemExit(1)
 
     def _handle_down(self):
@@ -1419,6 +1580,7 @@ class Orchestrator:
         if target_services:
             down_cmd.extend(target_services)
         self._run_command(down_cmd, check=False)
+        self._send_telemetry("pdavid_down", {})
 
     def _handle_build(self):
         target_services = getattr(self.args, "services", None) or []
