@@ -1,3 +1,10 @@
+# [1.43.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.42.0...v1.43.0) (2026-04-24)
+
+
+### Features
+
+* **deps:** cut over to projectdavid-core v1.42.x ([bca42d6](https://github.com/project-david-ai/projectdavid-platform/commit/bca42d6baaab299aacb30d0a9963abbe95eb860f))
+
 # [1.42.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.41.0...v1.42.0) (2026-04-19)
 
 
