@@ -299,6 +299,7 @@ services:
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - SHARED_PATH=/mnt/training_data
+      - MODEL_HUB_RUNTIME_ROOT=/opt/projectdavid/model-hub/models
       - HF_TOKEN=${HF_TOKEN:-}
       - HF_HOME=/root/.cache/huggingface
       - HF_HUB_OFFLINE=0
@@ -327,6 +328,9 @@ services:
       - tailscale_state:/var/lib/tailscale
       - ${SHARED_PATH:-./shared_data}:/mnt/training_data
       - ${HF_CACHE_PATH:-~/.cache/huggingface}:/root/.cache/huggingface
+      # Verified Q Model Hub runtime projections only.
+      # The inference worker must never receive write authority here.
+      - "${MODEL_HUB_RUNTIME_PATH:-./model-hub-runtime}:/opt/projectdavid/model-hub/models:ro"
     depends_on:
       - redis
     networks:
@@ -400,6 +404,7 @@ services:
       - WORKER_API_KEY=${ADMIN_API_KEY}
       - SANDBOX_AUTH_SECRET=${SANDBOX_AUTH_SECRET}
       - SHARED_PATH=/mnt/training_data
+      - MODEL_HUB_RUNTIME_ROOT=/opt/projectdavid/model-hub/models
       - PYTHONUNBUFFERED=1
     ports:
       - "9001:9001"
