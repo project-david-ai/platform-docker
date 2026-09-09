@@ -1,3 +1,23 @@
+# [1.47.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.46.0...v1.47.0) (2026-09-09)
+
+
+### Bug Fixes
+
+* disable vLLM V2 runner by default ([527edca](https://github.com/project-david-ai/projectdavid-platform/commit/527edca00a2523e4d6ca533d615a5f4d140d6c20))
+* emit startup progress before preflight ([1bc9710](https://github.com/project-david-ai/projectdavid-platform/commit/1bc9710978eea16ac3b3998956ceb9ccc47d600a))
+* satisfy platform static typing checks ([67d60be](https://github.com/project-david-ai/projectdavid-platform/commit/67d60be9b850270a7bdef4a7e4bb8e1f8528fe97))
+* synchronize packaged managed runtime composition ([0a928b9](https://github.com/project-david-ai/projectdavid-platform/commit/0a928b9be3fa1c92671bcf380cfe002969bdeecc))
+* use current Hugging Face CLI commands ([7bbaa4f](https://github.com/project-david-ai/projectdavid-platform/commit/7bbaa4f46a3c7ddd1a3340c4b849e83369f901cf))
+
+
+### Features
+
+* add machine-readable Ray deployment status ([e7699ba](https://github.com/project-david-ai/projectdavid-platform/commit/e7699ba686d1a3e3de871666c825fbc245d81d7a))
+* expose runtime startup progress ([d1d72f0](https://github.com/project-david-ai/projectdavid-platform/commit/d1d72f04fe55f11731eb7cdb31828ef686252a47))
+* improve machine-readable local runtime discovery ([613971a](https://github.com/project-david-ai/projectdavid-platform/commit/613971abf682f407c84f4b0367e154588be0661c))
+* mount verified model hub runtimes read-only ([cda642d](https://github.com/project-david-ai/projectdavid-platform/commit/cda642d3230d9665952798f4dd314b5e8f93daf2))
+* support Q managed runtime and startup telemetry ([83ce105](https://github.com/project-david-ai/projectdavid-platform/commit/83ce1053e8342918b548f888433ec59a3da9add0))
+
 # [1.46.0](https://github.com/project-david-ai/projectdavid-platform/compare/v1.45.0...v1.46.0) (2026-08-25)
 
 
