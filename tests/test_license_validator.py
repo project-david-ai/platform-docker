@@ -100,6 +100,7 @@ def test_preflight_stops_before_docker_when_license_gate_fails(monkeypatch):
         start_orchestration.Orchestrator
     )
     orchestrator.log = start_orchestration.log
+    orchestrator.progress_json = False
     orchestrator.args = type(
         "Args",
         (),
